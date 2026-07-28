@@ -9,9 +9,7 @@ Foxy es una plataforma educativa orientada a transformar la forma en que los est
 
 ---
 
-## Estructura de Módulos (Fuente de Verdad en `docs/`)
-
-El repositorio está organizado en módulos independientes. La carpeta `docs/` actúa como la **única fuente de verdad** para los contratos de API y esquemas compartidos entre Frontend y Backend.
+## Estructura 
 
 ```text
 foxy-app/
