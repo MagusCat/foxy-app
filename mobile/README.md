@@ -1,28 +1,50 @@
-# Módulo Mobile
+# Welcome to your Expo app 👋
 
-Este directorio alberga la aplicación móvil multiplataforma desarrollada en React Native para Foxy.
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
----
+## Get started
 
-## Responsabilidades del Módulo
+1. Install dependencies
 
-1. **Interfaz de Usuario (UI/UX)**: Proveer una experiencia intuitiva, fluida y accesible tanto para estudiantes como para docentes.
-2. **Consumo de APIs**: Comunicación con el servidor principal en Go (`backend`) para autenticación, gestión de perfiles y solicitudes de generación de contenido.
-3. **Interacción en Tiempo Real**: Soporte de eventos en tiempo real para la resolución y evaluación instantánea de pruebas y tests.
-4. **Gestión de Archivos**: Captura y carga de documentos (PDFs, imágenes de apuntes, textos) enviados por el usuario para alimentar el motor adaptativo.
+   ```bash
+   npm install
+   ```
 
----
+2. Start the app
 
-## Funciones Principales
+   ```bash
+   npx expo start
+   ```
 
-### Para Estudiantes
-- **Visualizador de Planes de Estudio**: Malla curricular interactiva con seguimiento de avance.
-- **Reproductor de Flashcards**: Sistema interactivo de tarjetas de memorización autodidacta.
-- **Módulo de Evaluación**: Interfaz de cuestionarios y tests con retroalimentación inmediata.
+In the output, you'll find options to open the app in a
 
-### Para Docentes
-- **Generador Asistido de Contenidos**: Formularios para parametrizar y recibir planes educativos de asignatura.
-- **Explorador de Recursos**: Vista de sugerencias didácticas y material de apoyo.
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-### Integración de IA
-- **Envío de Contexto**: Interfaz para adjuntar documentos que personalizan la respuesta de la IA.
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Get a fresh project
+
+When you're ready, run:
+
+```bash
+npm run reset-project
+```
+
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+
+## Learn more
+
+To learn more about developing your project with Expo, look at the following resources:
+
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+
+## Join the community
+
+Join our community of developers creating universal apps.
+
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
