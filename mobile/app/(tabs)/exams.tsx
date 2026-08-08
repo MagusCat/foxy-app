@@ -9,9 +9,10 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useScreenPadding } from '@/components/screen-header';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { getSubjectAccent } from '@/constants/subject-colors';
@@ -19,6 +20,7 @@ import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
+import { useStudyActivity } from '@/hooks/use-study-activity';
 
 const EXAM_SUBJECTS = [
   'Matemáticas',
@@ -37,14 +39,16 @@ type RecentExam = {
 };
 
 export default function ExamsScreen() {
-  const insets = useSafeAreaInsets();
+  const padding = useScreenPadding();
   const router = useRouter();
   const { isDark } = useTheme();
   const keyboardHeight = useKeyboardHeight();
   const iconOnSurface = isDark ? Palette.textPrimaryDark : Palette.textPrimaryLight;
 
-  const [streakCount] = useDailyStreak();
+  const [streakCount, , markStudied] = useDailyStreak();
+  const { logSession } = useStudyActivity();
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
+  const [avatarUri] = usePersistentState('foxy:avatar', '');
 
   const [school, setSchool] = usePersistentState('foxy:school', '');
   const [schoolInput, setSchoolInput] = useState('');
@@ -64,6 +68,17 @@ export default function ExamsScreen() {
     };
     setRecentExams([newExam, ...recentExams]);
     setCreateExamModalVisible(false);
+
+    // Crear un examen es actividad real: cuenta para la racha y aparece en
+    // el historial de "Mi actividad".
+    markStudied();
+    logSession({
+      kind: 'exam',
+      subject: examSubject,
+      title: `Examen de ${examSubject}`,
+      minutes: 15,
+    });
+
     Alert.alert('Examen creado', `Tu examen de ${examSubject} está listo para practicar.`);
   };
 
@@ -98,33 +113,45 @@ export default function ExamsScreen() {
       <ScrollView
         className="px-5"
         contentContainerStyle={{
-          paddingTop: Math.max(insets.top, 12),
-          paddingBottom: insets.bottom + 100,
+          paddingTop: padding.top,
+          paddingBottom: padding.tabBottom,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* BARRA SUPERIOR (HEADER) */}
-        <View className="flex-row items-center justify-between py-3">
-          <View className="flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3.5 py-[7px] dark:border-surface-dark-border dark:bg-surface-dark">
-            <Ionicons name="flame" size={20} color={Palette.flameOrange} />
-            <Text className="ml-1.5 text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
+        {/* BARRA SUPERIOR (HEADER): misma forma y alto que en Preguntar. */}
+        <View className="flex-row items-center justify-between pb-4">
+          <TouchableOpacity
+            className="h-9 flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark"
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Racha de ${streakCount} días. Ver mi actividad`}
+            onPress={() => router.push('/activity')}
+          >
+            <Ionicons name="flame" size={17} color={Palette.flameOrange} />
+            <Text className="ml-1 text-[14px] font-bold text-text-primary-light dark:text-text-primary-dark">
               {streakCount}
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            className="h-[38px] w-[38px] items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark"
+            className="h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark"
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Ir a mi perfil"
             onPress={() => router.push('/(tabs)/profile')}
           >
-            <Text className="text-base font-bold text-text-primary-light dark:text-text-primary-dark">
-              {userName.charAt(0).toUpperCase()}
-            </Text>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={{ height: '100%', width: '100%' }} contentFit="cover" />
+            ) : (
+              <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                {userName.charAt(0).toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
         {/* HERO: PREPÁRATE PARA TUS EXÁMENES */}
-        <View className="mt-2 items-start rounded-[24px] border border-card-light-border bg-card-light p-5 dark:border-card-dark-border dark:bg-card-dark">
+        <View className="items-start rounded-[24px] border border-card-light-border bg-card-light p-5 dark:border-card-dark-border dark:bg-card-dark">
           <View className="mb-3.5 flex-row">
             <View className="h-10 w-10 items-center justify-center rounded-full border-2 border-card-light bg-[#FEE2E2] dark:border-card-dark dark:bg-[#2D1B22]">
               <Ionicons name="flame" size={18} color={Palette.primary} />
