@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TabHeader, useScreenPadding } from '@/components/screen-header';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { getSubjectAccent } from '@/constants/subject-colors';
@@ -39,7 +39,7 @@ function generateRoomCode() {
 const EMPTY_FORM = { name: '', subject: '', teacher: '', schedule: '' };
 
 export default function ClassScreen() {
-  const insets = useSafeAreaInsets();
+  const padding = useScreenPadding();
   const { isDark } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
   const iconOnSurface = isDark ? Palette.textPrimaryDark : Palette.textPrimaryLight;
@@ -127,58 +127,55 @@ export default function ClassScreen() {
       <ScrollView
         className="px-5"
         contentContainerStyle={{
-          paddingTop: Math.max(insets.top, 12),
-          paddingBottom: insets.bottom + 100,
+          paddingTop: padding.top,
+          paddingBottom: padding.tabBottom,
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between py-3">
-          <View>
-            <Text className="text-[26px] font-bold text-text-primary-light dark:text-text-primary-dark">
-              Clase
-            </Text>
-            <Text className="mt-1 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
-              {rooms.length > 0
-                ? `${rooms.length} ${rooms.length === 1 ? 'salón' : 'salones'}`
-                : 'Organiza tus materias en salones'}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            className="rounded-[20px]"
-            style={{
-              elevation: 6,
-              shadowColor: Palette.primary,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isDark ? 0.5 : 0.25,
-              shadowRadius: 8,
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Crear salón"
-            onPress={openCreateForm}
-          >
-            <LinearGradient
-              colors={[Palette.primary, Palette.accentBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+        <TabHeader
+          title="Clase"
+          subtitle={
+            rooms.length > 0
+              ? `${rooms.length} ${rooms.length === 1 ? 'salón' : 'salones'}`
+              : 'Organiza tus materias en salones'
+          }
+          right={
+            <TouchableOpacity
+              activeOpacity={0.85}
+              className="rounded-[20px]"
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 20,
+                elevation: 6,
+                shadowColor: Palette.primary,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: isDark ? 0.5 : 0.25,
+                shadowRadius: 8,
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Crear salón"
+              onPress={openCreateForm}
             >
-              <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text className="text-[13px] font-bold text-white">Crear salón</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+              <LinearGradient
+                colors={[Palette.primary, Palette.accentBlue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 20,
+                }}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text className="text-[13px] font-bold text-white">Crear salón</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          }
+        />
 
         {rooms.length === 0 ? (
           /* ESTADO VACÍO */
-          <View className="mt-6 items-center rounded-[24px] border border-card-light-border bg-card-light px-6 py-10 dark:border-card-dark-border dark:bg-card-dark">
+          <View className="items-center rounded-[24px] border border-card-light-border bg-card-light px-6 py-10 dark:border-card-dark-border dark:bg-card-dark">
             <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-[#FEE2E2] dark:bg-[#2D1B22]">
               <Text className="text-3xl">🦊</Text>
             </View>
