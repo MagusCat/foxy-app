@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Fox",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,7 +21,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.mobile"
     },
     "web": {
       "output": "static",
@@ -29,6 +33,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fox necesita acceso a tus fotos para que puedas adjuntar apuntes y ejercicios al chat con Foxy.",
+          "cameraPermission": "Fox necesita la cámara para escanear tus problemas y tomar tu foto de perfil."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -45,6 +56,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e4edaf04-baa5-4854-bd84-ba150f7ec0cc"
+      }
     }
   }
 }

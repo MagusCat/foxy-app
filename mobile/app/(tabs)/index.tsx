@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,28 +9,32 @@ import {
   Modal,
   Switch,
   Alert,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { getSubjectAccent } from '@/constants/subject-colors';
+import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
+import { MathKeyboard } from '@/components/math-keyboard';
+import { useScreenPadding } from '@/components/screen-header';
+import { useAgenda, describeEventDate, daysUntil, EVENT_KIND_META } from '@/hooks/use-agenda';
+import { useDailyGoal } from '@/hooks/use-learning-prefs';
+import {
+  ANSWER_MODES,
+  usePendingQuestion,
+  useQuestionHistory,
+  type AnswerMode,
+} from '@/hooks/use-question-history';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
-
-type Attachment = {
-  id: string;
-  kind: 'image' | 'file';
-  name: string;
-  uri: string;
-};
+import { useAttachments, describeAttachment } from '@/hooks/use-attachments';
+import { useSubscription } from '@/hooks/use-subscription';
+import { useStudyActivity } from '@/hooks/use-study-activity';
 
 /** Formatos de lección que Foxy podrá generar. */
 const LESSON_TYPES: { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
@@ -72,11 +76,13 @@ const isIOS = Platform.OS === 'ios';
 // iOS usa objetivos táctiles ligeramente más grandes que Android.
 const ACTION_CIRCLE = isIOS ? 'h-10 w-10' : 'h-9 w-9';
 const CAMERA_PILL = isIOS ? 'h-10 w-12' : 'h-9 w-11';
+/** Alto común de la barra superior: racha, plan y avatar deben coincidir. */
+const HEADER_PILL = 'h-9';
 const TALK_PILL = isIOS ? 'h-10' : 'h-9';
 const ACTION_ICON_SIZE = isIOS ? 20 : 18;
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
+  const padding = useScreenPadding();
   const router = useRouter();
   const { isDark } = useTheme();
   const keyboardHeight = useKeyboardHeight();
@@ -85,18 +91,42 @@ export default function HomeScreen() {
 
   // Estados de la app (persistidos en el dispositivo)
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
+  const [avatarUri] = usePersistentState('foxy:avatar', '');
   const [subjects, setSubjects] = usePersistentState<string[]>('foxy:subjects', INITIAL_SUBJECTS);
   const [selectedSubject, setSelectedSubject] = usePersistentState(
     'foxy:selected-subject',
     'Matemáticas',
   );
   const [mood, setMood] = usePersistentState('foxy:mood', MOOD_OPTIONS[2]);
-  const [streakCount] = useDailyStreak();
+  const [streakCount, , markStudied] = useDailyStreak();
+  const { plan, isBasic, remaining, reachedLimit, registerQuestion } = useSubscription();
+  const { logSession } = useStudyActivity();
+  const { addQuestion } = useQuestionHistory();
+  const [pendingQuestion, setPendingQuestion] = usePendingQuestion();
+  const { upcoming } = useAgenda();
+  const goal = useDailyGoal();
 
   const [inputMessage, setInputMessage] = useState('');
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [answerMode, setAnswerMode] = usePersistentState<AnswerMode>('foxy:answer-mode', 'pasos');
+  const {
+    attachments,
+    addFromCamera,
+    addFromLibrary,
+    addFromFiles,
+    removeAttachment,
+    clearAttachments,
+  } = useAttachments();
   const subjectAccent = useMemo(() => getSubjectAccent(selectedSubject, isDark), [selectedSubject, isDark]);
   const canSend = inputMessage.trim().length > 0 || attachments.length > 0;
+
+  const currentMode = ANSWER_MODES.find((item) => item.value === answerMode) ?? ANSWER_MODES[0];
+  const cycleAnswerMode = () => {
+    const index = ANSWER_MODES.findIndex((item) => item.value === answerMode);
+    setAnswerMode(ANSWER_MODES[(index + 1) % ANSWER_MODES.length].value);
+  };
+
+  // Solo se anuncia lo que ya está encima: más allá de una semana estorba.
+  const nextEvent = upcoming.find((event) => daysUntil(event.date) <= 7);
 
   // Estados de edición y modales
   const [isEditMode, setIsEditMode] = useState(false);
@@ -106,86 +136,29 @@ export default function HomeScreen() {
   const [isOptionsModalVisible, setOptionsModalVisible] = useState(false);
   const [isMoodModalVisible, setMoodModalVisible] = useState(false);
   const [isStartModalVisible, setStartModalVisible] = useState(false);
+  const [isMathKeyboardVisible, setMathKeyboardVisible] = useState(false);
   const [solverEnabled, setSolverEnabled] = useState(true);
 
-  const addAttachments = (incoming: Omit<Attachment, 'id'>[]) => {
-    if (incoming.length === 0) return;
-    setAttachments((prev) => [
-      ...prev,
-      ...incoming.map((item, index) => ({ ...item, id: `${Date.now()}-${prev.length + index}` })),
-    ]);
-  };
+  /**
+   * "Volver a preguntar" desde el historial deja la pregunta aquí. Se carga en
+   * el campo y se limpia enseguida, para que no vuelva a aparecer sola.
+   */
+  useEffect(() => {
+    if (!pendingQuestion) return;
 
-  const removeAttachment = (id: string) => {
-    setAttachments((prev) => prev.filter((item) => item.id !== id));
-  };
+    setInputMessage(pendingQuestion.text);
+    setSelectedSubject(pendingQuestion.subject);
+    setPendingQuestion(null);
+  }, [pendingQuestion, setPendingQuestion, setSelectedSubject]);
 
-  // Cámara nativa
-  const handleCameraPress = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permiso denegado', 'Se requieren permisos de cámara para capturar fotos.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        quality: 0.8,
-      });
-      const asset = result.canceled ? undefined : result.assets?.[0];
-      if (asset) {
-        addAttachments([{ kind: 'image', uri: asset.uri, name: asset.fileName || 'Foto' }]);
-      }
-    } catch (error) {
-      console.log('Error abriendo la cámara:', error);
-      Alert.alert('No se pudo abrir la cámara', 'Inténtalo de nuevo.');
-    }
-  };
-
-  // Selector de fotos de la galería (múltiple, igual que los archivos)
-  const handlePhotosPress = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permiso denegado', 'Se requieren permisos para acceder a tus fotos.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        // allowsEditing es incompatible con la selección múltiple.
-        allowsMultipleSelection: true,
-        selectionLimit: 10,
-        quality: 0.8,
-      });
-      if (result.canceled) return;
-      addAttachments(
-        (result.assets ?? []).map((asset, index) => ({
-          kind: 'image' as const,
-          uri: asset.uri,
-          name: asset.fileName || `Imagen ${index + 1}`,
-        })),
-      );
-    } catch (error) {
-      console.log('Error abriendo la galería:', error);
-      Alert.alert('No se pudieron abrir tus fotos', 'Inténtalo de nuevo.');
-    }
-  };
-
-  // Selector de archivos (múltiple)
-  const handleFilesPress = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({ multiple: true });
-      if (result.canceled) return;
-      addAttachments(
-        (result.assets ?? []).map((asset, index) => ({
-          kind: 'file' as const,
-          uri: asset.uri,
-          name: asset.name || `Archivo ${index + 1}`,
-        })),
-      );
-    } catch (error) {
-      console.log('Error abriendo el selector de archivos:', error);
-      Alert.alert('No se pudo abrir el archivo', 'Inténtalo de nuevo.');
-    }
+  /**
+   * Cierra la hoja de opciones antes de abrir otra cosa. En iOS no se puede
+   * presentar un modal mientras otro se está cerrando, y en Android el
+   * selector nativo se queda detrás de la hoja si no se espera.
+   */
+  const closeOptionsThen = (action: () => void) => {
+    setOptionsModalVisible(false);
+    setTimeout(action, 260);
   };
 
   /**
@@ -202,7 +175,7 @@ export default function HomeScreen() {
 
   // Acciones del menú "Comenzar". Todo frontend: lo que necesita IA lo
   // decimos claramente, y lo que ya existe en la app navega de verdad.
-  const handleScanProblem = () => closeStartModalThen(handleCameraPress);
+  const handleScanProblem = () => closeStartModalThen(addFromCamera);
 
   const handleLessonType = (label: string) =>
     closeStartModalThen(() =>
@@ -217,26 +190,50 @@ export default function HomeScreen() {
 
   // Enviar: la IA todavía no está conectada, así que confirmamos lo que se
   // enviará en cuanto exista el backend en lugar de fingir una respuesta.
+  // Aun así el envío cuenta de verdad para la racha, la actividad y el cupo
+  // diario del plan, que sí son parte del frontend.
   const handleSend = () => {
     if (!canSend) return;
+
+    if (reachedLimit) {
+      Alert.alert(
+        'Ya usaste tus preguntas de hoy',
+        `${plan.name} incluye preguntas diarias limitadas. Mañana se renuevan solas, o puedes ver los otros planes con un adulto.`,
+        [
+          { text: 'Espero a mañana', style: 'cancel' },
+          { text: 'Ver planes', onPress: () => router.push('/subscription') },
+        ],
+      );
+      return;
+    }
+
+    const images = attachments.filter((item) => item.kind === 'image').length;
+    const files = attachments.length - images;
+    const text = inputMessage.trim();
     const parts = [
-      inputMessage.trim() ? 'tu pregunta' : null,
+      text ? 'tu pregunta' : null,
       attachments.length ? `${attachments.length} adjunto${attachments.length > 1 ? 's' : ''}` : null,
     ].filter(Boolean);
 
+    registerQuestion();
+    markStudied();
+    logSession({
+      kind: images > 0 ? 'scan' : 'chat',
+      subject: selectedSubject,
+      title: text || `${attachments.length} adjunto${attachments.length > 1 ? 's' : ''}`,
+      minutes: 5,
+    });
+    addQuestion({ text, subject: selectedSubject, mode: answerMode, images, files });
+
+    setInputMessage('');
+    clearAttachments();
+
     Alert.alert(
-      'Foxy todavía no está conectado',
+      'Guardado para Foxy',
       `Ya quedó listo ${parts.join(' y ')} sobre ${selectedSubject}. En cuanto conectemos la IA, Foxy responderá aquí mismo.`,
       [
-        { text: 'Seguir editando', style: 'cancel' },
-        {
-          text: 'Limpiar',
-          style: 'destructive',
-          onPress: () => {
-            setInputMessage('');
-            setAttachments([]);
-          },
-        },
+        { text: 'Entendido' },
+        { text: 'Ver mis preguntas', onPress: () => router.push('/history') },
       ],
     );
   };
@@ -296,33 +293,68 @@ export default function HomeScreen() {
         className="px-5"
         contentContainerClassName="flex-grow"
         contentContainerStyle={{
-          paddingTop: Math.max(insets.top, 12),
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : insets.bottom + 90,
+          paddingTop: padding.top,
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : padding.tabBottom - 10,
         }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* BARRA SUPERIOR (HEADER) */}
-        <View className="flex-row items-center justify-between py-3">
-          {/* Badge de Racha Destacado (Más Grande) */}
-          <View className="flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3.5 py-[7px] dark:border-surface-dark-border dark:bg-surface-dark">
-            <Ionicons name="flame" size={20} color={Palette.flameOrange} />
-            <Text className="ml-1.5 text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
-              {streakCount}
-            </Text>
+        {/* BARRA SUPERIOR (HEADER)
+            Racha y plan comparten forma y alto: son dos accesos del mismo
+            rango, así que se agrupan a la izquierda y el avatar queda solo a
+            la derecha. */}
+        <View className="flex-row items-center justify-between pb-4">
+          <View className="mr-2 flex-1 flex-row items-center gap-2">
+            <TouchableOpacity
+              className={`${HEADER_PILL} flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark`}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Racha de ${streakCount} días. Ver mi actividad`}
+              onPress={() => router.push('/activity')}
+            >
+              <Ionicons name="flame" size={17} color={Palette.flameOrange} />
+              <Text className="ml-1 text-[14px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                {streakCount}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className={`${HEADER_PILL} shrink flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark`}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`${plan.name}. Ver planes`}
+              onPress={() => router.push('/subscription')}
+            >
+              <Ionicons name={plan.icon} size={14} color={plan.color} />
+              <Text
+                className="ml-1.5 shrink text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark"
+                numberOfLines={1}
+              >
+                {plan.shortName}
+              </Text>
+              {isBasic && remaining !== null ? (
+                <Text className="ml-1.5 text-[13px] font-bold" style={{ color: plan.color }}>
+                  {remaining}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
           </View>
 
           {/* Avatar de Usuario */}
           <TouchableOpacity
-            className="h-[38px] w-[38px] items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark"
+            className={`${HEADER_PILL} aspect-square items-center justify-center overflow-hidden rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Ir a mi perfil"
             onPress={() => router.push('/(tabs)/profile')}
           >
-            <Text className="text-base font-bold text-text-primary-light dark:text-text-primary-dark">
-              {userName.charAt(0).toUpperCase()}
-            </Text>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={{ height: '100%', width: '100%' }} contentFit="cover" />
+            ) : (
+              <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                {userName.charAt(0).toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -366,25 +398,124 @@ export default function HomeScreen() {
               </Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* ATAJOS DEL DÍA: la meta de estudio y lo que viene en el calendario */}
+          <View className="mt-7 w-full gap-2">
+            <TouchableOpacity
+              className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Meta de hoy: ${goal.done} de ${goal.goal} minutos. Abrir modo enfoque`}
+              onPress={() => router.push('/focus')}
+            >
+              <View
+                className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+                style={{ backgroundColor: isDark ? '#331F14' : '#FFEDD5' }}
+              >
+                <Ionicons
+                  name={goal.met ? 'checkmark-circle' : 'timer-outline'}
+                  size={18}
+                  color={goal.met ? '#10B981' : Palette.flameOrange}
+                />
+              </View>
+
+              <View className="flex-1">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                    {goal.met ? '¡Meta de hoy cumplida!' : 'Meta de hoy'}
+                  </Text>
+                  <Text className="text-[11px] font-bold text-text-secondary-light dark:text-text-secondary-dark">
+                    {goal.done}/{goal.goal} min
+                  </Text>
+                </View>
+
+                <View className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-light dark:bg-surface-dark">
+                  <View
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.round(goal.ratio * 100)}%`,
+                      backgroundColor: goal.met ? '#10B981' : Palette.flameOrange,
+                    }}
+                  />
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={15} color="#6B7280" style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+
+            {nextEvent ? (
+              <TouchableOpacity
+                className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Próximo evento: ${nextEvent.title}, ${describeEventDate(nextEvent.date)}`}
+                onPress={() => router.push('/activity')}
+              >
+                <View
+                  className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: `${EVENT_KIND_META[nextEvent.kind].color}${isDark ? '2E' : '1F'}` }}
+                >
+                  <Ionicons
+                    name={EVENT_KIND_META[nextEvent.kind].icon}
+                    size={18}
+                    color={EVENT_KIND_META[nextEvent.kind].color}
+                  />
+                </View>
+
+                <View className="flex-1">
+                  <Text
+                    className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark"
+                    numberOfLines={1}
+                  >
+                    {nextEvent.title}
+                  </Text>
+                  <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                    {EVENT_KIND_META[nextEvent.kind].label} · {describeEventDate(nextEvent.date)}
+                  </Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={15} color="#6B7280" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         {/* PANEL INFERIOR DE ENTRADA Y SELECCIÓN DE MATERIA */}
         <View className="mt-auto w-full items-center">
-          {/* Selector de Materia */}
-          <TouchableOpacity
-            className="z-10 -mb-[13px] flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
-            style={{ borderColor: subjectAccent.color, elevation: 4 }}
-            activeOpacity={0.8}
-            onPress={() => {
-              setIsEditMode(false);
-              setSubjectModalVisible(true);
-            }}
-          >
-            <Text className="text-xs font-semibold" style={{ color: subjectAccent.color }}>
-              {selectedSubject}
-            </Text>
-            <Ionicons name="swap-vertical" size={14} color={subjectAccent.color} style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
+          <View className="z-10 -mb-[13px] flex-row items-center gap-2">
+            {/* Selector de Materia */}
+            <TouchableOpacity
+              className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
+              style={{ borderColor: subjectAccent.color, elevation: 4 }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Materia: ${selectedSubject}. Cambiar`}
+              onPress={() => {
+                setIsEditMode(false);
+                setSubjectModalVisible(true);
+              }}
+            >
+              <Text className="text-xs font-semibold" style={{ color: subjectAccent.color }}>
+                {selectedSubject}
+              </Text>
+              <Ionicons name="swap-vertical" size={14} color={subjectAccent.color} style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+
+            {/* Modo de respuesta: rota entre las tres formas de responder. */}
+            <TouchableOpacity
+              className="flex-row items-center rounded-[18px] border border-card-light-border bg-white px-3 py-[7px] dark:border-surface-dark-border dark:bg-[#1B1522]"
+              style={{ elevation: 4 }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Modo de respuesta: ${currentMode.label}. Tocar para cambiar`}
+              onPress={cycleAnswerMode}
+            >
+              <Ionicons name={currentMode.icon} size={13} color={iconOnSurface} />
+              <Text className="ml-1.5 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
+                {currentMode.label}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Panel Principal de Entrada */}
           <View
@@ -407,8 +538,11 @@ export default function HomeScreen() {
                     {attachment.kind === 'image' ? (
                       <Image
                         source={{ uri: attachment.uri }}
-                        className="h-7 w-7 rounded-lg"
-                        resizeMode="cover"
+                        style={{ height: 28, width: 28, borderRadius: 8 }}
+                        contentFit="cover"
+                        // Sin transición el thumbnail parpadea al agregar varias
+                        // fotos seguidas desde la galería.
+                        transition={120}
                       />
                     ) : (
                       <View className="h-7 w-7 items-center justify-center rounded-lg bg-card-light dark:bg-card-dark">
@@ -416,12 +550,17 @@ export default function HomeScreen() {
                       </View>
                     )}
 
-                    <Text
-                      className="mx-1.5 max-w-[120px] text-[11px] font-medium text-text-primary-light dark:text-text-primary-dark"
-                      numberOfLines={1}
-                    >
-                      {attachment.name}
-                    </Text>
+                    <View className="mx-1.5 max-w-[130px]">
+                      <Text
+                        className="text-[11px] font-medium text-text-primary-light dark:text-text-primary-dark"
+                        numberOfLines={1}
+                      >
+                        {attachment.name}
+                      </Text>
+                      <Text className="text-[9px] text-text-secondary-light dark:text-text-secondary-dark">
+                        {describeAttachment(attachment)}
+                      </Text>
+                    </View>
 
                     <TouchableOpacity
                       className="h-6 w-6 items-center justify-center rounded-full"
@@ -467,9 +606,21 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityLabel="Abrir cámara"
-                  onPress={handleCameraPress}
+                  onPress={addFromCamera}
                 >
                   <Ionicons name="camera" size={ACTION_ICON_SIZE} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                {/* Atajo directo al teclado matemático: escribir ecuaciones es
+                    lo más frecuente y no debería requerir abrir el menú "+". */}
+                <TouchableOpacity
+                  className={`${ACTION_CIRCLE} items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Abrir teclado matemático"
+                  onPress={() => setMathKeyboardVisible(true)}
+                >
+                  <Ionicons name="calculator-outline" size={ACTION_ICON_SIZE} color={iconOnSurface} />
                 </TouchableOpacity>
               </View>
 
@@ -757,10 +908,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 className="flex-1 items-center justify-center rounded-[14px] border border-[#E5E7EB] bg-white py-3.5 dark:border-[#2D2838] dark:bg-[#1F1C28]"
                 activeOpacity={0.7}
-                onPress={() => {
-                  setOptionsModalVisible(false);
-                  handleCameraPress();
-                }}
+                onPress={() => closeOptionsThen(addFromCamera)}
               >
                 <Ionicons name="camera-outline" size={22} color={Palette.accentBlueGlow} />
                 <Text className="mt-1.5 text-xs font-medium text-text-primary-light dark:text-text-primary-dark">
@@ -771,10 +919,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 className="flex-1 items-center justify-center rounded-[14px] border border-[#E5E7EB] bg-white py-3.5 dark:border-[#2D2838] dark:bg-[#1F1C28]"
                 activeOpacity={0.7}
-                onPress={() => {
-                  setOptionsModalVisible(false);
-                  handlePhotosPress();
-                }}
+                onPress={() => closeOptionsThen(addFromLibrary)}
               >
                 <Ionicons name="images-outline" size={22} color={Palette.primaryGlow} />
                 <Text className="mt-1.5 text-xs font-medium text-text-primary-light dark:text-text-primary-dark">
@@ -785,16 +930,67 @@ export default function HomeScreen() {
               <TouchableOpacity
                 className="flex-1 items-center justify-center rounded-[14px] border border-[#E5E7EB] bg-white py-3.5 dark:border-[#2D2838] dark:bg-[#1F1C28]"
                 activeOpacity={0.7}
-                onPress={() => {
-                  setOptionsModalVisible(false);
-                  handleFilesPress();
-                }}
+                onPress={() => closeOptionsThen(addFromFiles)}
               >
                 <Ionicons name="folder-outline" size={22} color="#FBBF24" />
                 <Text className="mt-1.5 text-xs font-medium text-text-primary-light dark:text-text-primary-dark">
                   Archivos
                 </Text>
+                <Text className="mt-0.5 text-[9px] text-text-secondary-light dark:text-text-secondary-dark">
+                  PDF y texto
+                </Text>
               </TouchableOpacity>
+            </View>
+
+            <Text className="mt-2 px-1 text-[10px] leading-[14px] text-text-secondary-light dark:text-text-secondary-dark">
+              Por ahora Foxy lee {ALLOWED_DOCUMENTS_LABEL}. Pronto añadiremos más formatos.
+            </Text>
+
+            <View className="my-3 h-px bg-[#E5E7EB] dark:bg-[#2A2533]" />
+
+            {/* Cómo quieres que Foxy responda */}
+            <Text className="mb-2 text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+              ¿Cómo quieres la respuesta?
+            </Text>
+            <View className="mb-1 gap-2">
+              {ANSWER_MODES.map((option) => {
+                const isSelected = option.value === answerMode;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    className="flex-row items-center rounded-[14px] border border-[#E5E7EB] bg-white px-3 py-2.5 dark:border-[#2D2838] dark:bg-[#1F1C28]"
+                    style={
+                      isSelected
+                        ? { borderColor: subjectAccent.color, backgroundColor: subjectAccent.soft }
+                        : undefined
+                    }
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    onPress={() => setAnswerMode(option.value)}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={18}
+                      color={isSelected ? subjectAccent.color : iconOnSurface}
+                    />
+                    <View className="ml-2.5 flex-1">
+                      <Text
+                        className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark"
+                        style={isSelected ? { color: subjectAccent.color } : undefined}
+                      >
+                        {option.label}
+                      </Text>
+                      <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                        {option.hint}
+                      </Text>
+                    </View>
+                    {isSelected ? (
+                      <Ionicons name="checkmark-circle" size={17} color={subjectAccent.color} />
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <View className="my-3 h-px bg-[#E5E7EB] dark:bg-[#2A2533]" />
@@ -825,10 +1021,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 className="flex-row items-center py-1"
                 activeOpacity={0.7}
-                onPress={() => {
-                  setOptionsModalVisible(false);
-                  showComingSoon('El teclado matemático');
-                }}
+                onPress={() => closeOptionsThen(() => setMathKeyboardVisible(true))}
               >
                 <View className="mr-2.5 w-7 items-center">
                   <Ionicons name="calculator-outline" size={20} color={iconOnSurface} />
@@ -841,6 +1034,45 @@ export default function HomeScreen() {
                     Ingresa símbolos y ecuaciones
                   </Text>
                 </View>
+                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="flex-row items-center py-1"
+                activeOpacity={0.7}
+                onPress={() => closeOptionsThen(() => router.push('/history'))}
+              >
+                <View className="mr-2.5 w-7 items-center">
+                  <Ionicons name="time-outline" size={20} color={iconOnSurface} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
+                    Mis preguntas
+                  </Text>
+                  <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                    Historial y preguntas guardadas
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="flex-row items-center py-1"
+                activeOpacity={0.7}
+                onPress={() => closeOptionsThen(() => router.push('/focus'))}
+              >
+                <View className="mr-2.5 w-7 items-center">
+                  <Ionicons name="timer-outline" size={20} color={iconOnSurface} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
+                    Modo enfoque
+                  </Text>
+                  <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                    Temporizador que suma minutos reales
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
               </TouchableOpacity>
 
               <View className="flex-row items-center py-1">
@@ -1076,6 +1308,16 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ========================================== */}
+      {/* MODAL 5: TECLADO MATEMÁTICO                */}
+      {/* ========================================== */}
+      <MathKeyboard
+        visible={isMathKeyboardVisible}
+        onClose={() => setMathKeyboardVisible(false)}
+        value={inputMessage}
+        onEdit={setInputMessage}
+      />
     </View>
   );
 }

@@ -1,13 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useMemo } from 'react';
+import { Alert, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
+import { AvatarEditor } from '@/components/avatar-editor';
+import { TabHeader, useScreenPadding } from '@/components/screen-header';
+import { Card, CardDivider, Row, SectionTitle, softTint } from '@/components/settings-ui';
+import { buildAchievements, countUnlocked } from '@/constants/achievements';
 import { Palette } from '@/constants/theme';
 import { ThemePreference, useTheme } from '@/contexts/theme-context';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
-import { usePersistentState, clearPersistedState, STORAGE_KEYS } from '@/hooks/use-persistent-state';
+import { clearPersistedState, usePersistentState, SESSION_KEYS } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
+import { useStudyActivity, formatMinutes } from '@/hooks/use-study-activity';
+import { useSubscription } from '@/hooks/use-subscription';
+import { useAgenda } from '@/hooks/use-agenda';
+import { useDailyGoal } from '@/hooks/use-learning-prefs';
+import { useQuestionHistory } from '@/hooks/use-question-history';
 
 const THEME_OPTIONS: {
   value: ThemePreference;
@@ -20,49 +28,52 @@ const THEME_OPTIONS: {
 ];
 
 export default function ProfileScreen() {
-  const insets = useSafeAreaInsets();
-  const keyboardHeight = useKeyboardHeight();
-  const { preference, setPreference, isDark, colors } = useTheme();
-  const accent = isDark ? Palette.primaryGlow : Palette.primary;
+  const padding = useScreenPadding();
+  const router = useRouter();
+  const { isDark, colors, preference, setPreference } = useTheme();
 
-  const [userName, setUserName] = usePersistentState('foxy:user-name', 'Usuario');
+  const [userName] = usePersistentState('foxy:user-name', 'Usuario');
   const [school] = usePersistentState('foxy:school', '');
   const [subjects] = usePersistentState<string[]>('foxy:subjects', []);
-  const [streakCount] = useDailyStreak();
+  const [, streak] = useDailyStreak();
+  const { stats } = useStudyActivity();
+  const { plan, isBasic, questionsToday, limit, remaining } = useSubscription();
+  const { upcoming, events } = useAgenda();
+  const { questions, saved } = useQuestionHistory();
+  const goal = useDailyGoal();
 
-  const [isNameModalVisible, setNameModalVisible] = useState(false);
-  const [nameInput, setNameInput] = useState('');
+  const usedRatio = limit ? Math.min(questionsToday / limit, 1) : 0;
 
-  const openNameModal = () => {
-    setNameInput(userName);
-    setNameModalVisible(true);
-  };
+  const achievements = useMemo(
+    () =>
+      countUnlocked(
+        buildAchievements({
+          streakBest: streak.best,
+          totalSessions: stats.totalSessions,
+          totalMinutes: stats.totalMinutes,
+          subjectsStudied: stats.bySubject.length,
+          examsCreated: stats.examsCreated,
+          eventsPlanned: events.length,
+          savedQuestions: saved.length,
+          goalsMet: [...stats.minutesByDay.values()].filter((minutes) => minutes >= goal.goal).length,
+        }),
+      ),
+    [streak.best, stats, events.length, saved.length, goal.goal],
+  );
 
-  const handleSaveName = () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed) {
-      Alert.alert('Campo vacío', 'Escribe cómo quieres que Foxy te llame.');
-      return;
-    }
-    setUserName(trimmed);
-    setNameModalVisible(false);
-  };
-
-  const handleResetData = () => {
+  const handleLogout = () => {
     Alert.alert(
-      'Borrar mis datos',
-      'Se eliminarán tus materias, salones, exámenes, escuela y preferencias guardadas en este dispositivo. No se puede deshacer.',
+      'Cerrar sesión',
+      'Todavía no existen las cuentas en línea, así que al cerrar sesión se borra tu perfil de este dispositivo: nombre, foto, escuela, salones, actividad y eventos. Tus preferencias de la app se quedan.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Borrar todo',
+          text: 'Cerrar sesión',
           style: 'destructive',
           onPress: async () => {
-            await clearPersistedState(STORAGE_KEYS);
-            Alert.alert(
-              'Datos borrados',
-              'Cierra y vuelve a abrir la app para empezar desde cero.',
-            );
+            await clearPersistedState(SESSION_KEYS);
+            router.replace('/(tabs)');
+            Alert.alert('Sesión cerrada', '¡Nos vemos pronto! Foxy te espera para seguir estudiando.');
           },
         },
       ],
@@ -72,189 +83,320 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
       <ScrollView
-        className="px-6"
-        contentContainerStyle={{
-          paddingTop: Math.max(insets.top, 16),
-          paddingBottom: insets.bottom + 100,
-        }}
+        className="px-5"
+        contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.tabBottom }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-[26px] font-bold text-text-primary-light dark:text-text-primary-dark">
-          Mi Perfil
-        </Text>
+        <TabHeader title="Mi perfil" />
 
-        {/* TARJETA DE USUARIO */}
+        {/* IDENTIDAD: la foto abre su selector y el resto lleva a Mi cuenta.
+            Son dos zonas táctiles hermanas, no anidadas: un pulsable dentro de
+            otro deja ambiguo qué responde al toque. */}
         <View
-          className="mt-5 flex-row items-center rounded-2xl border p-4"
+          className="flex-row items-center rounded-2xl border p-4"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
         >
-          <View
-            className="h-14 w-14 items-center justify-center rounded-full"
-            style={{ backgroundColor: isDark ? '#2D1B22' : '#FEE2E2' }}
-          >
-            <Text className="text-xl font-bold" style={{ color: accent }}>
-              {userName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-
-          <View className="ml-3 flex-1">
-            <Text
-              className="text-base font-bold text-text-primary-light dark:text-text-primary-dark"
-              numberOfLines={1}
-            >
-              {userName}
-            </Text>
-            <Text
-              className="mt-0.5 text-xs text-text-secondary-light dark:text-text-secondary-dark"
-              numberOfLines={1}
-            >
-              {school || 'Sin escuela asignada'}
-            </Text>
-          </View>
+          <AvatarEditor name={userName} size={58} />
 
           <TouchableOpacity
-            className="h-9 w-9 items-center justify-center rounded-full"
-            style={{ backgroundColor: colors.surface }}
+            className="ml-4 flex-1 flex-row items-center"
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Editar mi nombre"
-            onPress={openNameModal}
+            accessibilityLabel="Ver mi cuenta"
+            onPress={() => router.push('/settings/account')}
           >
-            <Ionicons name="pencil-outline" size={16} color={colors.icon} />
+            <View className="flex-1">
+              <Text
+                className="text-[17px] font-bold text-text-primary-light dark:text-text-primary-dark"
+                numberOfLines={1}
+              >
+                {userName}
+              </Text>
+              <Text
+                className="mt-0.5 text-[13px] text-text-secondary-light dark:text-text-secondary-dark"
+                numberOfLines={1}
+              >
+                {school || 'Sin escuela asignada'}
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={17} color={colors.icon} />
           </TouchableOpacity>
         </View>
+
+        {/* PLAN: única tarjeta a color de la pantalla, para que destaque. */}
+        <TouchableOpacity
+          className="mt-3 rounded-2xl border p-4"
+          style={{ backgroundColor: softTint(plan.color, isDark), borderColor: plan.color }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`${plan.name}. Ver planes de suscripción`}
+          onPress={() => router.push('/subscription')}
+        >
+          <View className="flex-row items-center">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-xl"
+              style={{ backgroundColor: colors.card }}
+            >
+              <Ionicons name={plan.icon} size={20} color={plan.color} />
+            </View>
+
+            <View className="ml-3 flex-1">
+              <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: plan.color }}>
+                Tu plan
+              </Text>
+              <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                {plan.name}
+              </Text>
+            </View>
+
+            <View
+              className="flex-row items-center rounded-full px-3 py-1.5"
+              style={{ backgroundColor: plan.color }}
+            >
+              <Text className="text-[12px] font-bold text-white">
+                {isBasic ? 'Mejorar' : 'Ver planes'}
+              </Text>
+            </View>
+          </View>
+
+          {isBasic && limit ? (
+            <View className="mt-3.5">
+              <View className="mb-1.5 flex-row items-center justify-between">
+                <Text className="text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
+                  Preguntas de hoy
+                </Text>
+                <Text className="text-[12px] font-bold" style={{ color: plan.color }}>
+                  {questionsToday} / {limit}
+                </Text>
+              </View>
+              <View className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: colors.card }}>
+                <View
+                  className="h-full rounded-full"
+                  style={{ width: `${Math.round(usedRatio * 100)}%`, backgroundColor: plan.color }}
+                />
+              </View>
+              <Text className="mt-1.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                {remaining === 0
+                  ? 'Se renuevan mañana. Los planes se cambian con un adulto.'
+                  : `Te quedan ${remaining} preguntas hoy. Sin anuncios ni cobros sorpresa.`}
+              </Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+
+        {/* RACHA */}
+        <TouchableOpacity
+          className="mt-3 rounded-2xl border p-4"
+          style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Racha de ${streak.count} días. Ver mi actividad`}
+          onPress={() => router.push('/activity')}
+        >
+          <View className="flex-row items-center">
+            <Ionicons name="flame" size={20} color={Palette.flameOrange} />
+            <Text className="ml-2 flex-1 text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
+              {streak.count} {streak.count === 1 ? 'día seguido' : 'días seguidos'}
+            </Text>
+            <Text className="mr-1 text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
+              Mejor: {streak.best}
+            </Text>
+            <Ionicons name="chevron-forward" size={15} color={colors.icon} />
+          </View>
+
+          <View className="mt-3.5 flex-row justify-between">
+            {streak.week.map((day) => (
+              <View key={day.key} className="items-center" style={{ width: 32 }}>
+                <Text className="mb-1 text-[10px] text-text-secondary-light dark:text-text-secondary-dark">
+                  {day.label}
+                </Text>
+                <View
+                  className="h-7 w-7 items-center justify-center rounded-full border"
+                  style={{
+                    backgroundColor: day.active ? Palette.flameOrange : colors.surface,
+                    borderColor: day.isToday ? Palette.flameOrange : colors.cardBorder,
+                    borderWidth: day.isToday ? 1.5 : 1,
+                    opacity: day.isFuture ? 0.4 : 1,
+                  }}
+                >
+                  {day.active ? <Ionicons name="flame" size={13} color="#FFFFFF" /> : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
 
         {/* RESUMEN */}
         <View className="mt-3 flex-row gap-3">
           {[
-            { icon: 'flame' as const, value: streakCount, label: 'días seguidos', color: Palette.flameOrange },
-            { icon: 'book-outline' as const, value: subjects.length, label: 'materias', color: Palette.accentBlue },
+            { value: formatMinutes(stats.weekMinutes), label: 'esta semana' },
+            { value: `${subjects.length}`, label: 'materias' },
+            { value: `${stats.totalSessions}`, label: 'sesiones' },
           ].map((stat) => (
             <View
               key={stat.label}
               className="flex-1 items-center rounded-2xl border py-3"
               style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
             >
-              <Ionicons name={stat.icon} size={18} color={stat.color} />
-              <Text className="mt-1 text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
+              <Text
+                className="text-[17px] font-bold text-text-primary-light dark:text-text-primary-dark"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
                 {stat.value}
               </Text>
-              <Text className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+              <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
                 {stat.label}
               </Text>
             </View>
           ))}
         </View>
 
-        {/* APARIENCIA */}
-        <View
-          className="mt-3 flex-row items-center justify-between rounded-2xl border p-3"
-          style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
-        >
-          <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-            Apariencia
-          </Text>
+        {/* MI PROGRESO */}
+        <SectionTitle>Mi progreso</SectionTitle>
+        <Card>
+          <Row icon="stats-chart-outline" label="Mi actividad" onPress={() => router.push('/activity')} />
+          <CardDivider />
+          <Row
+            icon="calendar-outline"
+            label="Calendario y eventos"
+            value={upcoming.length > 0 ? `${upcoming.length} próximos` : undefined}
+            onPress={() => router.push('/activity')}
+          />
+          <CardDivider />
+          <Row
+            icon="trophy-outline"
+            label="Mis logros"
+            value={`${achievements.unlocked}/${achievements.total}`}
+            onPress={() => router.push('/achievements')}
+          />
+          <CardDivider />
+          <Row
+            icon="chatbubbles-outline"
+            label="Mis preguntas"
+            value={questions.length > 0 ? `${questions.length}` : undefined}
+            onPress={() => router.push('/history')}
+          />
+          <CardDivider />
+          <Row icon="timer-outline" label="Modo enfoque" onPress={() => router.push('/focus')} />
+        </Card>
 
-          <View
-            className="flex-row items-center gap-1 rounded-full p-1"
-            style={{ backgroundColor: colors.surface }}
-          >
-            {THEME_OPTIONS.map((option) => {
-              const isSelected = preference === option.value;
+        {/* CUENTA */}
+        <SectionTitle>Cuenta</SectionTitle>
+        <Card>
+          <Row icon="person-outline" label="Mi cuenta" onPress={() => router.push('/settings/account')} />
+          <CardDivider />
+          <Row
+            icon="school-outline"
+            label="Mi escuela"
+            value={school || 'Sin agregar'}
+            onPress={() => router.push('/settings/school')}
+          />
+          <CardDivider />
+          <Row
+            icon="card-outline"
+            label="Suscripción"
+            value={plan.shortName}
+            onPress={() => router.push('/subscription')}
+          />
+        </Card>
 
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Tema ${option.label}`}
-                  accessibilityState={{ selected: isSelected }}
-                  onPress={() => setPreference(option.value)}
-                  className="h-8 w-8 items-center justify-center rounded-full"
-                  style={{ backgroundColor: isSelected ? accent : 'transparent' }}
-                >
-                  <Ionicons
-                    name={option.icon}
-                    size={16}
-                    color={isSelected ? '#FFFFFF' : colors.icon}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        {/* CONFIGURACIÓN */}
+        <SectionTitle>Configuración</SectionTitle>
+        <Card>
+          <Row
+            icon="sparkles-outline"
+            label="Preferencias de aprendizaje"
+            onPress={() => router.push('/settings/learning')}
+          />
+          <CardDivider />
+          <Row
+            icon="notifications-outline"
+            label="Notificaciones"
+            onPress={() => router.push('/settings/notifications')}
+          />
+          <CardDivider />
+          {/* El tema se cambia aquí mismo: es de lo que más se toca y no
+              merece una pantalla propia. */}
+          <Row
+            icon="contrast-outline"
+            label="Apariencia"
+            right={
+              <View
+                className="flex-row items-center gap-1 rounded-full p-1"
+                style={{ backgroundColor: colors.surface }}
+              >
+                {THEME_OPTIONS.map((option) => {
+                  const isSelected = preference === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Tema ${option.label}`}
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => setPreference(option.value)}
+                      className="h-7 w-7 items-center justify-center rounded-full"
+                      style={{ backgroundColor: isSelected ? colors.card : 'transparent' }}
+                    >
+                      <Ionicons
+                        name={option.icon}
+                        size={14}
+                        color={isSelected ? colors.text : colors.icon}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            }
+          />
+        </Card>
 
-        {/* ZONA PELIGROSA */}
+        {/* PRIVACIDAD */}
+        <SectionTitle>Privacidad</SectionTitle>
+        <Card>
+          <Row
+            icon="lock-closed-outline"
+            label="Privacidad y datos"
+            onPress={() => router.push('/settings/privacy')}
+          />
+        </Card>
+
+        {/* AYUDA */}
+        <SectionTitle>Ayuda</SectionTitle>
+        <Card>
+          <Row
+            icon="help-circle-outline"
+            label="Ayuda y soporte"
+            onPress={() => router.push('/settings/help')}
+          />
+          <CardDivider />
+          <Row
+            icon="information-circle-outline"
+            label="¿Qué es Fox?"
+            onPress={() => router.push('/settings/about-fox')}
+          />
+        </Card>
+
+        {/* CERRAR SESIÓN */}
         <TouchableOpacity
-          className="mt-3 flex-row items-center rounded-2xl border p-4"
+          className="mt-6 flex-row items-center justify-center rounded-2xl border py-3.5"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Borrar mis datos"
-          onPress={handleResetData}
+          accessibilityLabel="Cerrar sesión"
+          onPress={handleLogout}
         >
-          <Ionicons name="trash-outline" size={18} color="#EF4444" />
-          <View className="ml-3 flex-1">
-            <Text className="text-sm font-semibold" style={{ color: '#EF4444' }}>
-              Borrar mis datos
-            </Text>
-            <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-              Elimina todo lo guardado en este dispositivo
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+          <Ionicons name="log-out-outline" size={18} color="#EF4444" style={{ marginRight: 7 }} />
+          <Text className="text-[15px] font-semibold" style={{ color: '#EF4444' }}>
+            Cerrar sesión
+          </Text>
         </TouchableOpacity>
-      </ScrollView>
 
-      {/* MODAL: EDITAR NOMBRE */}
-      <Modal
-        visible={isNameModalVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setNameModalVisible(false)}
-      >
-        <View
-          className="flex-1 items-center justify-center bg-black/55 px-6 dark:bg-black/80"
-          style={{ paddingBottom: keyboardHeight }}
-        >
-          <View
-            className="w-full rounded-[22px] border border-[#E5E7EB] bg-white p-5 dark:border-[#342F42] dark:bg-[#1C1924]"
-            style={{ elevation: 10 }}
-          >
-            <Text className="mb-1 text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-              ¿Cómo te llamas?
-            </Text>
-            <Text className="mb-3.5 text-xs text-text-secondary-light dark:text-text-secondary-dark">
-              Así te saludará Foxy.
-            </Text>
-            <TextInput
-              className="mb-[18px] rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
-              placeholder="Tu nombre"
-              placeholderTextColor="#6B7280"
-              value={nameInput}
-              onChangeText={setNameInput}
-              autoFocus
-              maxLength={24}
-              returnKeyType="done"
-              onSubmitEditing={handleSaveName}
-            />
-            <View className="flex-row justify-end gap-2.5">
-              <TouchableOpacity
-                className="rounded-2xl px-4 py-2"
-                onPress={() => setNameModalVisible(false)}
-              >
-                <Text className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity className="rounded-2xl bg-primary px-5 py-2" onPress={handleSaveName}>
-                <Text className="text-sm font-semibold text-white">Guardar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        <Text className="mt-4 text-center text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+          Fox 🦊 — hecho para estudiar sin agobios
+        </Text>
+      </ScrollView>
     </View>
   );
 }
