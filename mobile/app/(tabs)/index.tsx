@@ -363,7 +363,7 @@ export default function HomeScreen() {
             el saludo queda centrado en la pantalla y no pegado arriba. */}
         <View className="flex-1 items-center justify-center py-8">
           <Text className="text-center text-[22px] font-bold tracking-[-0.3px] text-text-primary-light dark:text-text-primary-dark">
-            ¡Hola {userName}, bienvenido! 👋
+            ¡Hola {userName}! ¿Qué quiere estudiar hoy?
           </Text>
 
           <TouchableOpacity
@@ -394,7 +394,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
               <Text className="text-sm font-bold text-white" numberOfLines={1}>
-                Comenzar
+                Comienza aquí
               </Text>
             </LinearGradient>
           </TouchableOpacity>
