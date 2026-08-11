@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Listener = (serialized: string, from: symbol) => void;
+/** `null` significa "la clave se borró": cada instancia vuelve a su inicial. */
+type Listener = (serialized: string | null, from: symbol) => void;
 
 /**
  * Las pestañas siguen montadas al cambiar de tab, así que dos pantallas que
@@ -10,7 +11,7 @@ type Listener = (serialized: string, from: symbol) => void;
  */
 const listeners = new Map<string, Set<Listener>>();
 
-function broadcast(key: string, serialized: string, from: symbol) {
+function broadcast(key: string, serialized: string | null, from: symbol) {
   listeners.get(key)?.forEach((listener) => listener(serialized, from));
 }
 
@@ -22,6 +23,13 @@ export function usePersistentState<T>(key: string, initialValue: T) {
   const instanceId = useRef<symbol>(Symbol(key));
   // Último valor ya escrito/recibido: corta los bucles de eco entre instancias.
   const lastSerialized = useRef<string | null>(null);
+  // El inicial se lee en el listener de borrado, donde el closure sería viejo.
+  // Se actualiza en un efecto y no durante el render: mutar una ref mientras
+  // se renderiza rompe al compilador de React, que está activado.
+  const initialRef = useRef(initialValue);
+  useEffect(() => {
+    initialRef.current = initialValue;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +58,16 @@ export function usePersistentState<T>(key: string, initialValue: T) {
   useEffect(() => {
     const self = instanceId.current;
     const listener: Listener = (serialized, from) => {
-      if (from === self || lastSerialized.current === serialized) return;
+      if (from === self) return;
+
+      // Clave borrada (cerrar sesión / borrar datos): volvemos al inicial.
+      if (serialized === null) {
+        lastSerialized.current = null;
+        setValue(initialRef.current);
+        return;
+      }
+
+      if (lastSerialized.current === serialized) return;
       lastSerialized.current = serialized;
       try {
         setValue(JSON.parse(serialized) as T);
@@ -83,19 +100,53 @@ export function usePersistentState<T>(key: string, initialValue: T) {
   return [value, setValue, hydrated] as const;
 }
 
-/** Borra todo lo que guarda la app. Usado por "Borrar mis datos" en Perfil. */
+/**
+ * Borra claves guardadas y avisa a las pantallas montadas para que vuelvan a
+ * su valor inicial. Sin el aviso había que reiniciar la app para ver el
+ * resultado de "Borrar mis datos" o "Cerrar sesión".
+ */
 export async function clearPersistedState(keys: string[]) {
   await AsyncStorage.multiRemove(keys);
+
+  const source = Symbol('reset');
+  keys.forEach((key) => broadcast(key, null, source));
 }
 
 export const STORAGE_KEYS = [
   'foxy:theme-preference',
   'foxy:user-name',
+  'foxy:avatar',
+  'foxy:account',
   'foxy:subjects',
   'foxy:selected-subject',
   'foxy:mood',
   'foxy:school',
+  'foxy:grade',
   'foxy:recent-exams',
   'foxy:classrooms',
   'foxy:streak',
+  'foxy:activity-log',
+  'foxy:events',
+  'foxy:questions',
+  'foxy:pending-question',
+  'foxy:answer-mode',
+  'foxy:plan',
+  'foxy:usage',
+  'foxy:notifications',
+  'foxy:learning',
+];
+
+/** Lo que se limpia al cerrar sesión: la cuenta, no las preferencias del equipo. */
+export const SESSION_KEYS = [
+  'foxy:user-name',
+  'foxy:avatar',
+  'foxy:account',
+  'foxy:school',
+  'foxy:grade',
+  'foxy:recent-exams',
+  'foxy:classrooms',
+  'foxy:activity-log',
+  'foxy:events',
+  'foxy:questions',
+  'foxy:usage',
 ];
