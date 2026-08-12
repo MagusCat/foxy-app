@@ -22,8 +22,6 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={NavigationThemes[colorScheme]}>
-      {/* Las pantallas apiladas traen su propio encabezado (ScreenShell), así
-          que el del navegador se oculta en todas. */}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />

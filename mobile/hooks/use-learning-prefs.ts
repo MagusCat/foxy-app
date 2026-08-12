@@ -6,7 +6,6 @@ export type LearningPrefs = {
   level: 'basico' | 'intermedio' | 'avanzado';
   tone: 'amigable' | 'neutral' | 'motivador';
   language: 'es' | 'en';
-  /** Minutos de estudio al día que el usuario se propuso. */
   dailyGoal: number;
   showFullSolution: boolean;
   extraPractice: boolean;
@@ -28,13 +27,6 @@ export function useLearningPrefs() {
   return usePersistentState<LearningPrefs>('foxy:learning', DEFAULT_LEARNING_PREFS);
 }
 
-/**
- * Progreso de la meta diaria de estudio.
- *
- * La meta ya existía como preferencia pero no se usaba en ningún lado. Ahora
- * la calculamos contra los minutos reales de hoy para poder mostrarla en el
- * inicio, en el perfil y en la actividad.
- */
 export function useDailyGoal() {
   const [prefs] = useLearningPrefs();
   const { stats } = useStudyActivity();

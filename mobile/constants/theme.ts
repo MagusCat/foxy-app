@@ -1,39 +1,29 @@
 import { DarkTheme, DefaultTheme, type Theme } from '@react-navigation/native';
 import { Platform } from 'react-native';
 
-/**
- * Palette - Variables globales de color del proyecto Foxy
- * Paleta de tonos Rojos, Azules y tonalidades derivadas.
- */
 export const Palette = {
-  // Tonos Rojos Principales
-  primary: '#EF4444',         // Rojo carmesí vibrante
-  primaryDark: '#DC2626',     // Rojo oscuro
-  primaryGlow: '#F87171',     // Resplandor rojo claro
+  primary: '#EF4444',
+  primaryDark: '#DC2626',
+  primaryGlow: '#F87171',
 
-  // Tonos Azules Principales
-  accentBlue: '#3B82F6',      // Azul real / eléctrico
-  accentBlueDark: '#1D4ED8',  // Azul profundo
-  accentBlueGlow: '#60A5FA',  // Resplandor azul
+  accentBlue: '#3B82F6',
+  accentBlueDark: '#1D4ED8',
+  accentBlueGlow: '#60A5FA',
 
-  // Tonos Complementarios
-  accentPurple: '#A855F7',    // Violeta acento
-  flameOrange: '#F97316',     // Naranja racha
+  accentPurple: '#A855F7',
+  flameOrange: '#F97316',
 
-  // Modo Oscuro (Fondos y Superficies)
-  bgDark: '#0C0B0E',          // Fondo principal ultra oscuro
-  cardDark: '#16151B',        // Tarjetas y paneles de entrada
-  cardDarkBorder: '#2D2533',  // Bordes de tarjetas con ligero matiz
-  surfaceDark: '#211F2B',     // Superficie de botones redondos y cápsulas
-  surfaceDarkBorder: '#383144',// Bordes de superficies
+  bgDark: '#0C0B0E',
+  cardDark: '#16151B',
+  cardDarkBorder: '#2D2533',
+  surfaceDark: '#211F2B',
+  surfaceDarkBorder: '#383144',
 
-  // Modo Claro
   bgLight: '#F9FAFB',
   cardLight: '#FFFFFF',
   cardLightBorder: '#E5E7EB',
   surfaceLight: '#F3F4F6',
 
-  // Colores de Texto
   textPrimaryDark: '#FFFFFF',
   textSecondaryDark: '#9CA3AF',
   textMutedDark: '#6B7280',

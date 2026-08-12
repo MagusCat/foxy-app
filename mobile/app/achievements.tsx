@@ -30,7 +30,6 @@ export default function AchievementsScreen() {
         examsCreated: stats.examsCreated,
         eventsPlanned: events.length,
         savedQuestions: saved.length,
-        // Días del historial en los que se alcanzó la meta diaria actual.
         goalsMet: [...stats.minutesByDay.values()].filter((minutes) => minutes >= goal.goal).length,
       }),
     [streak.best, stats, events.length, saved.length, goal.goal],
@@ -41,7 +40,6 @@ export default function AchievementsScreen() {
 
   return (
     <ScreenShell title="Mis logros" subtitle="Lo que has conseguido estudiando con Foxy">
-      {/* RESUMEN */}
       <View
         className="mt-2 rounded-[22px] border p-[18px]"
         style={{ backgroundColor: softTint('#F59E0B', isDark), borderColor: '#F59E0B' }}
