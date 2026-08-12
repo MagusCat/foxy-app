@@ -10,14 +10,12 @@ import { useTheme } from '@/contexts/theme-context';
 export const MIN_GRADE = 50;
 export const MAX_GRADE = 100;
 
-/** El arco no cierra el círculo: el hueco de abajo marca dónde empieza. */
 const START_ANGLE = 135;
 const SWEEP = 270;
 
 const STROKE = 18;
 const KNOB_RADIUS = 14;
 const KNOB_STROKE = 4;
-/** Cuánto sobresale el pomo del trazo: el aro se mete hacia dentro para que quepa. */
 const INSET = Math.max(STROKE / 2, KNOB_RADIUS + KNOB_STROKE / 2);
 
 function polar(cx: number, cy: number, radius: number, degrees: number) {
@@ -37,14 +35,6 @@ function gradeToAngle(grade: number) {
   return START_ANGLE + ratio * SWEEP;
 }
 
-/**
- * Traduce el punto que toca el dedo a una nota.
- *
- * En el hueco de abajo no se calcula nada: se mantiene el extremo del que
- * viene el gesto. Si se cogiera el más cercano, arrastrar de largo por debajo
- * saltaría de 100 % a 50 % de golpe, que es lo que hacía que el dial pareciera
- * volverse loco.
- */
 function pointToGrade(x: number, y: number, center: number, previous: number) {
   const degrees = (Math.atan2(y - center, x - center) * 180) / Math.PI;
   let offset = degrees - START_ANGLE;
@@ -62,15 +52,9 @@ type GradeDialProps = {
   onChange: (value: number) => void;
   size?: number;
   color: string;
-  /** Avisa mientras se arrastra, para poder bloquear el scroll de la pantalla. */
   onDragChange?: (dragging: boolean) => void;
 };
 
-/**
- * Selector circular de calificación objetivo (50 % a 100 %). Se puede
- * arrastrar sobre el aro o ajustar de uno en uno con los botones, que además
- * es la única forma accesible con lector de pantalla.
- */
 export function GradeDial({ value, onChange, size = 232, color, onDragChange }: GradeDialProps) {
   const { colors, isDark } = useTheme();
 
@@ -81,13 +65,10 @@ export function GradeDial({ value, onChange, size = 232, color, onDragChange }: 
   const angle = gradeToAngle(clamped);
   const knob = polar(center, center, radius, angle);
 
-  // El valor vive fuera del responder: el gesto lee siempre el último
-  // publicado y así no se dispara un cambio por cada píxel repetido.
   const latest = useRef(clamped);
   latest.current = clamped;
 
   const container = useRef<View>(null);
-  /** Esquina del dial en la pantalla, para poder trabajar con `pageX/pageY`. */
   const origin = useRef({ x: 0, y: 0 });
 
   const responder = useMemo(
@@ -95,17 +76,12 @@ export function GradeDial({ value, onChange, size = 232, color, onDragChange }: 
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
-        // Una vez cogido el gesto no se suelta: si no, el scroll de la
-        // pantalla se lo lleva en cuanto el dedo sube o baja un poco.
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
 
         onPanResponderGrant: (event) => {
           onDragChange?.(true);
 
-          // En `grant` las coordenadas locales sí son de esta vista; se
-          // aprovecha para apuntar dónde está en pantalla y poder seguir el
-          // dedo aunque se salga del dial.
           const { locationX, locationY, pageX, pageY } = event.nativeEvent;
           origin.current = { x: pageX - locationX, y: pageY - locationY };
 
@@ -117,9 +93,6 @@ export function GradeDial({ value, onChange, size = 232, color, onDragChange }: 
         },
 
         onPanResponderMove: (event) => {
-          // Fuera de la vista, `locationX/locationY` dejan de ser fiables
-          // (pasan a referirse a lo que haya debajo del dedo); `pageX/pageY`
-          // siempre valen.
           const x = event.nativeEvent.pageX - origin.current.x;
           const y = event.nativeEvent.pageY - origin.current.y;
 
@@ -128,7 +101,6 @@ export function GradeDial({ value, onChange, size = 232, color, onDragChange }: 
 
           latest.current = next;
           onChange(next);
-          // Un toque seco cada 5 puntos: marcar cada grado vibra sin parar.
           if (next % 5 === 0) Haptics.selectionAsync().catch(() => {});
         },
 
@@ -160,8 +132,6 @@ export function GradeDial({ value, onChange, size = 232, color, onDragChange }: 
         }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       >
-        {/* El SVG no intercepta el toque: el gesto lo maneja el contenedor,
-            que es el único que da coordenadas locales fiables. */}
         <Svg width={size} height={size} pointerEvents="none">
           <Path
             d={arcPath(center, center, radius, START_ANGLE, START_ANGLE + SWEEP)}

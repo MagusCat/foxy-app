@@ -31,12 +31,7 @@ export function isAllowedDocument(name: string, mimeType?: string | null): boole
   return ALLOWED_DOCUMENT_EXTENSIONS.includes(getExtension(name));
 }
 
-/**
- * La galería de Android devuelve nombres como
- * `79bac03b-5d84-4dae-b0a0-38f243297846.jpeg`, que no le dicen nada a nadie
- * en la lista de material. Cuando el nombre es solo un identificador se
- * cambia por uno legible; si el archivo tiene nombre de verdad, se respeta.
- */
+
 export function isOpaqueFileName(name: string): boolean {
   const base = name.slice(0, name.length - (getExtension(name).length + 1)) || name;
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(base)) return true;

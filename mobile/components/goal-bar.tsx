@@ -4,20 +4,13 @@ import { Text, View } from 'react-native';
 import { useTheme } from '@/contexts/theme-context';
 
 type GoalBarProps = {
-  /** Dominio actual, 0 a 1. */
   ratio: number;
-  /** Calificación objetivo en porcentaje: se dibuja como marca en la barra. */
   target: number;
   color: string;
-  /** Muestra la etiqueta "calificación objetivo" sobre la marca. */
   withTargetLabel?: boolean;
   height?: number;
 };
 
-/**
- * Barra de dominio con la marca de la calificación objetivo. La meta se ve
- * siempre, aunque el avance sea 0: es la referencia de a dónde hay que llegar.
- */
 export function GoalBar({ ratio, target, color, withTargetLabel, height = 8 }: GoalBarProps) {
   const { colors } = useTheme();
   const clamped = Math.min(Math.max(ratio, 0), 1);
@@ -31,7 +24,6 @@ export function GoalBar({ ratio, target, color, withTargetLabel, height = 8 }: G
             className="absolute text-[10px] font-semibold italic"
             style={{
               color: '#F59E0B',
-              // La etiqueta se centra sobre la marca sin salirse por los lados.
               left: `${targetRatio * 100}%`,
               transform: [{ translateX: -52 }],
               width: 104,

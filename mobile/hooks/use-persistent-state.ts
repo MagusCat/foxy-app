@@ -28,13 +28,6 @@ export function usePersistentState<T>(key: string, initialValue: T) {
     initialRef.current = initialValue;
   });
 
-  /**
-   * Leer del disco es asíncrono, así que hay un hueco entre el primer render
-   * y el valor real. Los cambios que caen en ese hueco (empezar el
-   * temporizador nada más abrir, terminar una lección al entrar al tema) se
-   * apuntan aquí y se vuelven a aplicar sobre lo que venía guardado. Antes se
-   * perdían: la hidratación llegaba después y los pisaba.
-   */
   const pending = useRef<((prev: T) => T)[]>([]);
   const hydratedRef = useRef(false);
 
@@ -55,7 +48,6 @@ export function usePersistentState<T>(key: string, initialValue: T) {
         const queued = pending.current;
         pending.current = [];
 
-        // Lo guardado es la base; encima van los cambios de este hueco.
         if (stored !== undefined) lastSerialized.current = raw;
 
         if (queued.length > 0) {

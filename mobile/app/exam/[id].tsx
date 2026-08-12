@@ -31,16 +31,12 @@ import {
   useStudyPlan,
   type PlanMaterial,
 } from '@/hooks/use-study-plans';
+import { persistMedia } from '@/lib/media';
 
 type TabKey = 'temas' | 'progreso' | 'archivos';
 
 const WEEKDAY_SHORT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 
-/**
- * Tira de días alrededor de hoy. El día del examen lleva birrete y los días
- * ya pasados van en línea discontinua, para que el calendario se lea de un
- * vistazo sin abrir el mes completo.
- */
 function DayStrip({ examDate }: { examDate: string }) {
   const { colors } = useTheme();
   const today = localDay(new Date());
@@ -61,9 +57,6 @@ function DayStrip({ examDate }: { examDate: string }) {
       };
     });
 
-    // Un examen a meses vista cae fuera de la ventana y la tira quedaba sin
-    // birrete: se engancha al final, separado, para que siga estando a la
-    // vista sin dibujar los cien días de en medio.
     if (window.some((day) => day.isExam) || examDate < today) return window;
 
     const exam = new Date(`${examDate}T00:00:00`);
@@ -189,10 +182,6 @@ export default function ExamPlanScreen() {
   const picker = useAttachments();
   const { attachments, clearAttachments } = picker;
 
-  /**
-   * Lo que se elige en el selector entra en el plan y se vacía enseguida: el
-   * hook es el buzón temporal, la lista buena vive en el plan guardado.
-   */
   useEffect(() => {
     if (!plan || attachments.length === 0) return;
 
@@ -202,15 +191,13 @@ export default function ExamPlanScreen() {
         id: item.id,
         kind: item.kind,
         name: item.name,
-        uri: item.uri,
+        uri: persistMedia(item.uri, item.kind),
         size: item.size,
       })),
     );
     clearAttachments();
   }, [attachments, plan, addMaterials, clearAttachments]);
 
-  // Leer del disco tarda un instante: sin esta espera se vería un "ya no
-  // existe" en cuanto se abre la pantalla, antes de cargar los planes.
   if (!plan && !hydrated) {
     return <View className="flex-1 bg-bg-light dark:bg-bg-dark" />;
   }
@@ -267,8 +254,6 @@ export default function ExamPlanScreen() {
         contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.stackBottom }}
         showsVerticalScrollIndicator={false}
       >
-        {/* BARRA SUPERIOR: volver a la izquierda y todo lo demás junto a la
-            derecha, que es donde cae el pulgar. */}
         <View className="flex-row items-center px-5 pb-4">
           <TouchableOpacity
             className="h-9 w-9 items-center justify-center rounded-full border"
@@ -324,10 +309,8 @@ export default function ExamPlanScreen() {
           </View>
         </View>
 
-        {/* TIRA DE DÍAS */}
         <DayStrip examDate={plan.examDate} />
 
-        {/* TÍTULO */}
         <View className="mt-6 px-5">
           <Text className="text-center text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
             {plan.subject}
@@ -337,7 +320,6 @@ export default function ExamPlanScreen() {
           </Text>
         </View>
 
-        {/* CUENTA ATRÁS */}
         <View className="mt-5 px-5">
           <LinearGradient
             colors={
@@ -375,7 +357,6 @@ export default function ExamPlanScreen() {
           </LinearGradient>
         </View>
 
-        {/* PESTAÑAS */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -418,7 +399,6 @@ export default function ExamPlanScreen() {
           })}
         </ScrollView>
 
-        {/* ---------------- TEMAS DE ESTUDIO ---------------- */}
         {tab === 'temas' ? (
           <View className="mt-5 px-5">
             {plan.topics.map((topic, index) => {
@@ -476,7 +456,6 @@ export default function ExamPlanScreen() {
           </View>
         ) : null}
 
-        {/* ---------------- PROGRESO ---------------- */}
         {tab === 'progreso' ? (
           <View className="mt-5 px-5">
             <View
@@ -534,7 +513,6 @@ export default function ExamPlanScreen() {
               />
             </View>
 
-            {/* META DIARIA */}
             <View
               className="mt-3 flex-row items-center rounded-[20px] border p-4"
               style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
@@ -554,7 +532,6 @@ export default function ExamPlanScreen() {
               </Text>
             </View>
 
-            {/* CALENDARIO DEL MES */}
             <View
               className="mt-3 rounded-[20px] border p-4"
               style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
@@ -562,7 +539,6 @@ export default function ExamPlanScreen() {
               <MonthCalendar examDay={plan.examDate} />
             </View>
 
-            {/* RACHA */}
             <View
               className="mt-3 items-center rounded-[20px] border px-4 py-6"
               style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
@@ -587,7 +563,6 @@ export default function ExamPlanScreen() {
           </View>
         ) : null}
 
-        {/* ---------------- ARCHIVOS ---------------- */}
         {tab === 'archivos' ? (
           <View className="mt-5 px-5">
             <View className="mb-4 flex-row gap-2.5">
@@ -698,7 +673,6 @@ export default function ExamPlanScreen() {
         ) : null}
       </ScrollView>
 
-      {/* HOJA: AGREGAR MATERIAL */}
       <Modal
         visible={isAddVisible}
         transparent
@@ -743,14 +717,12 @@ export default function ExamPlanScreen() {
         </View>
       </Modal>
 
-      {/* HOJA: SIGUIENTE LECCIÓN (botón Crear) */}
       <NextLessonSheet
         visible={isLessonSheetVisible}
         onClose={() => setLessonSheetVisible(false)}
         plan={plan}
       />
 
-      {/* HOJA: INFORMACIÓN Y AJUSTES (tres puntos) */}
       <PlanSettingsSheet
         visible={isSettingsVisible}
         onClose={() => setSettingsVisible(false)}

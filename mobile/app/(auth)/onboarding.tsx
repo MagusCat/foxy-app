@@ -61,11 +61,6 @@ export default function OnboardingScreen() {
 
   const isLast = index === SLIDES.length - 1;
 
-  /**
-   * La ilustración se mide contra el alto además del ancho: en pantallas
-   * bajas, un cuadro de 260 px empujaba el título fuera de la zona visible
-   * (el carrusel es horizontal y no deja bajar).
-   */
   const artSize = Math.min(width - 96, height * 0.3, 260);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

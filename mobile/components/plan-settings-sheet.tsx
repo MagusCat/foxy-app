@@ -19,7 +19,6 @@ type PlanSettingsSheetProps = {
   plan: StudyPlan;
   onUpdate: (patch: Partial<StudyPlan>) => void;
   onDelete: () => void;
-  /** Lleva a la pestaña de archivos de la preparación. */
   onOpenSources: () => void;
 };
 
@@ -58,10 +57,6 @@ function SettingRow({
   );
 }
 
-/**
- * El menú de los tres puntos de una preparación: primero qué es, y detrás los
- * ajustes con los que se puede rehacer lo que se eligió al crearla.
- */
 export function PlanSettingsSheet({
   visible,
   onClose,
@@ -121,7 +116,6 @@ export function PlanSettingsSheet({
           className="max-h-[90%] rounded-t-[26px] px-[18px] pt-[18px]"
           style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
         >
-          {/* CABECERA */}
           <View className="mb-4 flex-row items-center">
             {view === 'info' ? (
               <View className="h-[34px] w-[34px]" />
@@ -158,7 +152,6 @@ export function PlanSettingsSheet({
             keyboardShouldPersistTaps="handled"
             scrollEnabled={!isDialActive}
           >
-            {/* QUÉ ES ESTA PREPARACIÓN */}
             {view === 'info' ? (
               <>
                 <View className="mb-5 flex-row items-center">
@@ -247,7 +240,6 @@ export function PlanSettingsSheet({
               </>
             ) : null}
 
-            {/* AJUSTES */}
             {view === 'config' ? (
               <>
                 <SettingRow
@@ -319,7 +311,6 @@ export function PlanSettingsSheet({
               </>
             ) : null}
 
-            {/* EDITAR TÍTULO */}
             {view === 'title' ? (
               <>
                 <TextInput
@@ -350,7 +341,6 @@ export function PlanSettingsSheet({
               </>
             ) : null}
 
-            {/* EDITAR CALIFICACIÓN */}
             {view === 'grade' ? (
               <View className="items-center pb-2">
                 <GradeDial
@@ -373,7 +363,6 @@ export function PlanSettingsSheet({
               </View>
             ) : null}
 
-            {/* EDITAR FECHA */}
             {view === 'date' ? (
               <>
                 <MonthCalendar

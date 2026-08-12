@@ -42,7 +42,6 @@ export default function ActivityScreen() {
 
   return (
     <ScreenShell title="Mi actividad" subtitle="Tu progreso de estudio y lo que viene">
-        {/* El calendario vive en su propia pantalla: aquí solo se entra. */}
         <View
           className="mt-2 flex-row rounded-full p-1"
           style={{ backgroundColor: colors.surface }}

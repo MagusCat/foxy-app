@@ -38,18 +38,9 @@ type NextLessonSheetProps = {
   visible: boolean;
   onClose: () => void;
   plan: StudyPlan;
-  /** Tema ya elegido: entonces no se pregunta por él. */
   topicId?: string;
 };
 
-/**
- * Lo que el botón "Crear" ofrece dentro de una preparación: formatos de
- * lección sobre el material del examen. Al elegir uno se pide el tema, salvo
- * que ya se venga desde dentro de uno.
- *
- * Ninguno genera contenido todavía: hasta que exista la IA se dice
- * claramente, en lugar de fingir una lección vacía.
- */
 export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonSheetProps) {
   const { colors } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
@@ -57,7 +48,6 @@ export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonS
   const [tab, setTab] = useState<Tab>('aprender');
   const [pending, setPending] = useState<string | null>(null);
 
-  // Al cerrar se vuelve al principio: reabrirla a medio camino despista.
   useEffect(() => {
     if (visible) return;
     setPending(null);
@@ -109,7 +99,6 @@ export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonS
           className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
           style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
         >
-          {/* CABECERA */}
           <View className="mb-4 flex-row items-center">
             {pending ? (
               <TouchableOpacity
@@ -184,7 +173,6 @@ export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonS
             </ScrollView>
           ) : (
             <>
-              {/* PESTAÑAS */}
               <View className="mb-5 flex-row rounded-full p-1" style={{ backgroundColor: colors.surface }}>
                 {TABS.map((item) => {
                   const isActive = tab === item.value;

@@ -52,21 +52,22 @@ export default function ExamsScreen() {
         contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.tabBottom }}
         showsVerticalScrollIndicator={false}
       >
-        {/* BARRA SUPERIOR: racha, comprar y avatar */}
-        <View className="flex-row items-center justify-between pb-5">
-          <TouchableOpacity
-            className="h-9 flex-row items-center rounded-full border px-3"
-            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Racha de ${streakCount} ${streakCount === 1 ? 'día' : 'días'}. Ver mi actividad`}
-            onPress={() => router.push('/activity')}
-          >
-            <Ionicons name="flame" size={17} color={Palette.flameOrange} />
-            <Text className="ml-1 text-[14px] font-bold text-text-primary-light dark:text-text-primary-dark">
-              {streakCount}
-            </Text>
-          </TouchableOpacity>
+        <View className="flex-row items-center pb-5">
+          <View className="flex-1 flex-row">
+            <TouchableOpacity
+              className="h-9 flex-row items-center rounded-full border px-3"
+              style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Racha de ${streakCount} ${streakCount === 1 ? 'día' : 'días'}. Ver mi actividad`}
+              onPress={() => router.push('/activity')}
+            >
+              <Ionicons name="flame" size={17} color={Palette.flameOrange} />
+              <Text className="ml-1 text-[14px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                {streakCount}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             activeOpacity={0.85}
@@ -91,25 +92,30 @@ export default function ExamsScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            className="h-9 w-9 items-center justify-center overflow-hidden rounded-full border"
-            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Ir a mi perfil"
-            onPress={() => router.push('/(tabs)/profile')}
-          >
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={{ height: '100%', width: '100%' }} contentFit="cover" />
-            ) : (
-              <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
-                {userName.charAt(0).toUpperCase()}
-              </Text>
-            )}
-          </TouchableOpacity>
+          <View className="flex-1 flex-row justify-end">
+            <TouchableOpacity
+              className="h-9 w-9 items-center justify-center overflow-hidden rounded-full border"
+              style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Ir a mi perfil"
+              onPress={() => router.push('/(tabs)/profile')}
+            >
+              {avatarUri ? (
+                <Image
+                  source={{ uri: avatarUri }}
+                  style={{ height: '100%', width: '100%' }}
+                  contentFit="cover"
+                />
+              ) : (
+                <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                  {userName.charAt(0).toUpperCase()}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* BUSCAR Y CREAR */}
         <View className="flex-row items-center gap-2.5">
           <View
             className="h-11 flex-1 flex-row items-center rounded-full border px-3.5"
@@ -151,7 +157,6 @@ export default function ExamsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* MIS PREPARACIONES DE EXAMEN */}
         <View className="mt-7">
           <View className="mb-3 flex-row items-center">
             <Text className="text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -265,7 +270,6 @@ export default function ExamsScreen() {
           )}
         </View>
 
-        {/* MI ESCUELA */}
         <View className="mt-7">
           <Text className="mb-3 text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
             Mi escuela
@@ -287,15 +291,19 @@ export default function ExamsScreen() {
                 <Ionicons name="pencil" size={15} color={colors.icon} />
               </TouchableOpacity>
 
-              <View className="flex-row items-center">
-                <Text style={{ fontSize: 26 }}>🌿</Text>
+              <View className="w-full flex-row items-center justify-center">
+                <View className="w-9 items-center">
+                  <Text style={{ fontSize: 24, lineHeight: 30 }}>🌿</Text>
+                </View>
                 <View
                   className="mx-2 h-14 w-14 items-center justify-center rounded-2xl"
                   style={{ backgroundColor: colors.surface }}
                 >
-                  <Text style={{ fontSize: 26 }}>🏛️</Text>
+                  <Text style={{ fontSize: 26, lineHeight: 32 }}>🏛️</Text>
                 </View>
-                <Text style={{ fontSize: 26, transform: [{ scaleX: -1 }] }}>🌿</Text>
+                <View className="w-9 items-center">
+                  <Text style={{ fontSize: 24, lineHeight: 30, transform: [{ scaleX: -1 }] }}>🌿</Text>
+                </View>
               </View>
 
               <Text

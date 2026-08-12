@@ -77,6 +77,7 @@ function RootLayoutContent() {
         <Stack.Screen name="exam/new" />
         <Stack.Screen name="exam/[id]" />
         <Stack.Screen name="exam/topic" />
+        <Stack.Screen name="class/[id]" />
         <Stack.Screen name="subscription" />
         <Stack.Screen name="settings/account" />
         <Stack.Screen name="settings/school" />

@@ -8,6 +8,7 @@ import { useTheme } from '@/contexts/theme-context';
 import { pickSingleImage } from '@/hooks/use-attachments';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
+import { deleteMedia, persistMedia } from '@/lib/media';
 
 type AvatarEditorProps = {
   name: string;
@@ -21,15 +22,29 @@ export function AvatarEditor({ name, size = 64, editable = true }: AvatarEditorP
 
   const [avatarUri, setAvatarUri] = usePersistentState('foxy:avatar', '');
   const [isSheetVisible, setSheetVisible] = useState(false);
+  const [isPicking, setPicking] = useState(false);
 
   const accent = isDark ? Palette.primaryGlow : Palette.primary;
   const initial = name.trim().charAt(0).toUpperCase() || 'F';
 
-  const choose = async (source: 'camera' | 'library') => {
+  const choose = (source: 'camera' | 'library') => {
+    if (isPicking) return;
+
+    setPicking(true);
     setSheetVisible(false);
     setTimeout(async () => {
-      const uri = await pickSingleImage(source);
-      if (uri) setAvatarUri(uri);
+      try {
+        const uri = await pickSingleImage(source);
+        if (!uri) return;
+
+        const stored = persistMedia(uri, 'avatar');
+        setAvatarUri((previous) => {
+          if (previous && previous !== stored) deleteMedia(previous);
+          return stored;
+        });
+      } finally {
+        setPicking(false);
+      }
     }, 260);
   };
 
@@ -48,6 +63,7 @@ export function AvatarEditor({ name, size = 64, editable = true }: AvatarEditorP
             label: 'Quitar foto',
             danger: true,
             onPress: () => {
+              deleteMedia(avatarUri);
               setAvatarUri('');
               setSheetVisible(false);
             },

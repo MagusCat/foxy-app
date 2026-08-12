@@ -1,54 +1,56 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  Alert,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+
 import { TabHeader, useScreenPadding } from '@/components/screen-header';
+import { softTint } from '@/components/settings-ui';
+import { TimePickerSheet } from '@/components/time-picker-sheet';
+import { getSubjectAccent } from '@/constants/subject-colors';
+import { mergeSubjects } from '@/constants/subjects';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
-import { getSubjectAccent } from '@/constants/subject-colors';
+import { generateRoomCode, useClassrooms, type Classroom } from '@/hooks/use-classrooms';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
+import { formatTime12 } from '@/lib/time';
 
-export type Classroom = {
-  id: string;
-  name: string;
-  subject: string;
-  teacher: string;
-  schedule: string;
-  code: string;
-};
+export type { Classroom } from '@/hooks/use-classrooms';
 
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-function generateRoomCode() {
-  let code = '';
-  for (let i = 0; i < 6; i += 1) {
-    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
-  }
-  return code;
+const EMPTY_FORM = { name: '', subject: '', teacher: '', days: [] as string[], time: '' };
+
+function composeSchedule(days: string[], time: string) {
+  if (days.length === 0 && !time) return '';
+
+  const ordered = DAYS.filter((day) => days.includes(day));
+  const label =
+    ordered.length === 0
+      ? ''
+      : ordered.length === 1
+        ? ordered[0]
+        : `${ordered.slice(0, -1).join(', ')} y ${ordered[ordered.length - 1]}`;
+
+  if (!time) return label;
+  return label ? `${label} · ${formatTime12(time)}` : formatTime12(time);
 }
-
-const EMPTY_FORM = { name: '', subject: '', teacher: '', schedule: '' };
 
 export default function ClassScreen() {
   const padding = useScreenPadding();
-  const { isDark } = useTheme();
+  const router = useRouter();
+  const { isDark, colors } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
-  const iconOnSurface = isDark ? Palette.textPrimaryDark : Palette.textPrimaryLight;
 
-  const [rooms, setRooms] = usePersistentState<Classroom[]>('foxy:classrooms', []);
+  const { rooms, setRooms } = useClassrooms();
+  const [savedSubjects] = usePersistentState<string[]>('foxy:subjects', []);
+  const catalog = useMemo(() => mergeSubjects(savedSubjects).slice(0, 18), [savedSubjects]);
 
   const [isFormVisible, setFormVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [isTimeVisible, setTimeVisible] = useState(false);
 
   const openCreateForm = () => {
     setEditingId(null);
@@ -62,7 +64,8 @@ export default function ClassScreen() {
       name: room.name,
       subject: room.subject,
       teacher: room.teacher,
-      schedule: room.schedule,
+      days: DAYS.filter((day) => room.schedule.includes(day)),
+      time: '',
     });
     setFormVisible(true);
   };
@@ -72,6 +75,12 @@ export default function ClassScreen() {
     setEditingId(null);
     setForm(EMPTY_FORM);
   };
+
+  const toggleDay = (day: string) =>
+    setForm((prev) => ({
+      ...prev,
+      days: prev.days.includes(day) ? prev.days.filter((item) => item !== day) : [...prev.days, day],
+    }));
 
   const handleSubmit = () => {
     const name = form.name.trim();
@@ -92,16 +101,22 @@ export default function ClassScreen() {
       name,
       subject: form.subject.trim(),
       teacher: form.teacher.trim(),
-      schedule: form.schedule.trim(),
+      schedule: composeSchedule(form.days, form.time),
     };
 
     if (editingId) {
       setRooms(rooms.map((room) => (room.id === editingId ? { ...room, ...details } : room)));
     } else {
-      setRooms([
-        { id: `${Date.now()}`, code: generateRoomCode(), ...details },
-        ...rooms,
-      ]);
+      const created: Classroom = {
+        id: `${Date.now()}`,
+        code: generateRoomCode(),
+        posts: [],
+        ...details,
+      };
+      setRooms([created, ...rooms]);
+      closeForm();
+      setTimeout(() => router.push({ pathname: '/class/[id]', params: { id: created.id } }), 260);
+      return;
     }
 
     closeForm();
@@ -126,10 +141,7 @@ export default function ClassScreen() {
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
       <ScrollView
         className="px-5"
-        contentContainerStyle={{
-          paddingTop: padding.top,
-          paddingBottom: padding.tabBottom,
-        }}
+        contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.tabBottom }}
         showsVerticalScrollIndicator={false}
       >
         <TabHeader
@@ -174,20 +186,29 @@ export default function ClassScreen() {
         />
 
         {rooms.length === 0 ? (
-          <View className="items-center rounded-[24px] border border-card-light-border bg-card-light px-6 py-10 dark:border-card-dark-border dark:bg-card-dark">
-            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-[#FEE2E2] dark:bg-[#2D1B22]">
+          <View
+            className="items-center rounded-[24px] border px-6 py-10"
+            style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+          >
+            <View
+              className="mb-4 h-16 w-16 items-center justify-center rounded-full"
+              style={{ backgroundColor: softTint(Palette.primary, isDark) }}
+            >
               <Text className="text-3xl">🦊</Text>
             </View>
             <Text className="mb-2 text-center text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
               Aún no tienes salones
             </Text>
             <Text className="mb-5 text-center text-[13px] leading-[19px] text-text-secondary-light dark:text-text-secondary-dark">
-              Crea un salón para agrupar tus apuntes, materiales y exámenes por materia. Foxy los
-              usará para darte ayuda más precisa.
+              Crea un salón para agrupar tus apuntes, tareas y anuncios por materia. Foxy los usará
+              para darte ayuda más precisa.
             </Text>
             <TouchableOpacity
-              className="flex-row items-center rounded-2xl bg-primary px-5 py-3"
+              className="flex-row items-center rounded-2xl px-5 py-3"
+              style={{ backgroundColor: Palette.primary }}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Crear mi primer salón"
               onPress={openCreateForm}
             >
               <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -199,16 +220,22 @@ export default function ClassScreen() {
             {rooms.map((room) => {
               const accent = getSubjectAccent(room.subject || room.name, isDark);
               const meta = [room.subject, room.teacher].filter(Boolean).join(' · ');
+              const pending = (room.posts ?? []).filter((post) => post.kind === 'tarea').length;
 
               return (
-                <View
+                <TouchableOpacity
                   key={room.id}
-                  className="mb-3 overflow-hidden rounded-[20px] border border-card-light-border bg-card-light dark:border-card-dark-border dark:bg-card-dark"
+                  className="mb-3 overflow-hidden rounded-[20px] border"
+                  style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Entrar a ${room.name}`}
+                  onPress={() => router.push({ pathname: '/class/[id]', params: { id: room.id } })}
                 >
                   <View style={{ height: 4, backgroundColor: accent.color }} />
 
                   <View className="p-4">
-                    <View className="flex-row items-start justify-between">
+                    <View className="flex-row items-start">
                       <View className="flex-1 pr-2">
                         <Text
                           className="text-base font-bold text-text-primary-light dark:text-text-primary-dark"
@@ -234,7 +261,7 @@ export default function ClassScreen() {
                           accessibilityLabel={`Editar ${room.name}`}
                           onPress={() => openEditForm(room)}
                         >
-                          <Ionicons name="pencil-outline" size={17} color={iconOnSurface} />
+                          <Ionicons name="pencil-outline" size={17} color={colors.text} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           className="h-9 w-9 items-center justify-center rounded-full"
@@ -248,42 +275,46 @@ export default function ClassScreen() {
                       </View>
                     </View>
 
-                    <View className="mt-3 flex-row items-center justify-between">
+                    <View className="mt-3 flex-row items-center">
                       {room.schedule ? (
                         <View className="flex-row items-center">
-                          <Ionicons name="time-outline" size={13} color="#6B7280" />
+                          <Ionicons name="time-outline" size={13} color={colors.icon} />
                           <Text className="ml-1 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
                             {room.schedule}
                           </Text>
                         </View>
-                      ) : (
-                        <View />
-                      )}
+                      ) : null}
 
-                      <TouchableOpacity
+                      {pending > 0 ? (
+                        <View
+                          className="ml-2 rounded-full px-2 py-0.5"
+                          style={{ backgroundColor: softTint('#F97316', isDark) }}
+                        >
+                          <Text className="text-[10px] font-bold" style={{ color: '#F97316' }}>
+                            {pending} {pending === 1 ? 'tarea' : 'tareas'}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      <View className="flex-1" />
+
+                      <View
                         className="flex-row items-center rounded-full px-2.5 py-1"
                         style={{ backgroundColor: accent.soft }}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Código del salón ${room.code}`}
-                        onPress={() =>
-                          Alert.alert(
-                            'Código del salón',
-                            `${room.code}\n\nCuando conectemos la app, tus compañeros podrán unirse a "${room.name}" con este código.`,
-                          )
-                        }
                       >
-                        <Ionicons name="key-outline" size={12} color={accent.color} />
-                        <Text
-                          className="ml-1 text-[11px] font-bold"
-                          style={{ color: accent.color }}
-                        >
-                          {room.code}
+                        <Text className="text-[11px] font-bold" style={{ color: accent.color }}>
+                          Entrar
                         </Text>
-                      </TouchableOpacity>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={12}
+                          color={accent.color}
+                          style={{ marginLeft: 4 }}
+                        />
+                      </View>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -301,20 +332,21 @@ export default function ClassScreen() {
         <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
           <TouchableOpacity className="flex-1" activeOpacity={1} onPress={closeForm} />
           <View
-            className="max-h-[85%] rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
-            style={{ paddingBottom: sheetPaddingBottom }}
+            className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
+            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
           >
             <View className="mb-3.5 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
                 {editingId ? 'Editar salón' : 'Nuevo salón'}
               </Text>
               <TouchableOpacity
-                className="h-[30px] w-[30px] items-center justify-center rounded-full bg-[#F3F4F6] dark:bg-[#2A2533]"
+                className="h-[30px] w-[30px] items-center justify-center rounded-full"
+                style={{ backgroundColor: colors.surface }}
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar"
                 onPress={closeForm}
               >
-                <Ionicons name="close" size={18} color={iconOnSurface} />
+                <Ionicons name="close" size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -327,48 +359,111 @@ export default function ClassScreen() {
                 Nombre del salón *
               </Text>
               <TextInput
-                className="mb-3 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
+                className="mb-4 rounded-[14px] border px-3.5 py-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
+                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
                 placeholder="Ej. Matemáticas 3ºB"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.icon}
                 value={form.name}
                 onChangeText={(name) => setForm((prev) => ({ ...prev, name }))}
                 autoFocus
               />
 
-              <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+              <Text className="mb-2 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
                 Materia
               </Text>
-              <TextInput
-                className="mb-3 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
-                placeholder="Ej. Matemáticas"
-                placeholderTextColor="#6B7280"
-                value={form.subject}
-                onChangeText={(subject) => setForm((prev) => ({ ...prev, subject }))}
-              />
+              <View className="mb-4 flex-row flex-wrap gap-2">
+                {catalog.map((subject) => {
+                  const isSelected = form.subject === subject;
+                  const accent = getSubjectAccent(subject, isDark);
+                  return (
+                    <TouchableOpacity
+                      key={subject}
+                      className="rounded-2xl border-[1.5px] px-3 py-2"
+                      style={{
+                        borderColor: isSelected ? accent.color : colors.cardBorder,
+                        backgroundColor: isSelected ? accent.soft : colors.background,
+                      }}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() =>
+                        setForm((prev) => ({ ...prev, subject: isSelected ? '' : subject }))
+                      }
+                    >
+                      <Text
+                        className="text-[13px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
+                        style={isSelected ? { color: accent.color, fontWeight: '700' } : undefined}
+                      >
+                        {subject}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
               <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
                 Profesor
               </Text>
               <TextInput
-                className="mb-3 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
+                className="mb-4 rounded-[14px] border px-3.5 py-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
+                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
                 placeholder="Ej. Prof. Ramírez"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.icon}
                 value={form.teacher}
                 onChangeText={(teacher) => setForm((prev) => ({ ...prev, teacher }))}
               />
 
-              <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                Horario
+              <Text className="mb-2 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                Días de clase
               </Text>
-              <TextInput
-                className="mb-5 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
-                placeholder="Ej. Lun y Mié 10:00"
-                placeholderTextColor="#6B7280"
-                value={form.schedule}
-                onChangeText={(schedule) => setForm((prev) => ({ ...prev, schedule }))}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-              />
+              <View className="mb-4 flex-row flex-wrap gap-2">
+                {DAYS.map((day) => {
+                  const isOn = form.days.includes(day);
+                  return (
+                    <TouchableOpacity
+                      key={day}
+                      className="h-11 w-11 items-center justify-center rounded-full border-[1.5px]"
+                      style={{
+                        borderColor: isOn ? Palette.primary : colors.cardBorder,
+                        backgroundColor: isOn ? softTint(Palette.primary, isDark) : colors.background,
+                      }}
+                      activeOpacity={0.75}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isOn }}
+                      accessibilityLabel={day}
+                      onPress={() => toggleDay(day)}
+                    >
+                      <Text
+                        className="text-[12px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
+                        style={isOn ? { color: Palette.primary } : undefined}
+                      >
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                Hora
+              </Text>
+              <TouchableOpacity
+                className="mb-5 flex-row items-center rounded-[14px] border px-3.5 py-3"
+                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Elegir la hora de clase"
+                onPress={() => setTimeVisible(true)}
+              >
+                <Ionicons name="time-outline" size={17} color={colors.icon} />
+                <Text
+                  className="ml-2.5 flex-1 text-sm"
+                  style={{ color: form.time ? colors.text : colors.icon }}
+                >
+                  {form.time ? formatTime12(form.time) : 'Sin hora'}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.icon} />
+              </TouchableOpacity>
             </ScrollView>
 
             <View className="mt-2 flex-row justify-end gap-2.5">
@@ -378,8 +473,11 @@ export default function ClassScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className="rounded-2xl bg-primary px-6 py-3"
+                className="rounded-2xl px-6 py-3"
+                style={{ backgroundColor: Palette.primary }}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={editingId ? 'Guardar' : 'Crear salón'}
                 onPress={handleSubmit}
               >
                 <Text className="text-sm font-bold text-white">
@@ -390,6 +488,18 @@ export default function ClassScreen() {
           </View>
         </View>
       </Modal>
+
+      <TimePickerSheet
+        visible={isTimeVisible}
+        title="Hora de clase"
+        description="Desliza para elegir la hora"
+        value={form.time || '08:00'}
+        onCancel={() => setTimeVisible(false)}
+        onSave={(time) => {
+          setForm((prev) => ({ ...prev, time }));
+          setTimeVisible(false);
+        }}
+      />
     </View>
   );
 }

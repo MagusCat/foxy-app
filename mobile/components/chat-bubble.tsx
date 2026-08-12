@@ -11,7 +11,6 @@ function formatTime(iso: string) {
   return `${date.getHours()}:${`${date.getMinutes()}`.padStart(2, '0')}`;
 }
 
-/** Un mensaje del hilo: los tuyos a la derecha, los de Foxy a la izquierda. */
 export function ChatBubble({ message, accent }: { message: ChatMessage; accent: string }) {
   const { colors, isDark } = useTheme();
   const isUser = message.role === 'user';

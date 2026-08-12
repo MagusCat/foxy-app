@@ -3,22 +3,14 @@ import { View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 type ProgressRingProps = {
-  /** Lado del círculo en px. */
   size?: number;
   stroke?: number;
-  /** 0 a 1. */
   ratio: number;
   color: string;
   trackColor: string;
-  /** Lo que va dentro del anillo (normalmente el porcentaje). */
   children?: React.ReactNode;
 };
 
-/**
- * Anillo de progreso. Se dibuja con un trazo discontinuo cuyo primer tramo
- * mide lo avanzado: es un único `Circle`, así que no hay costuras entre
- * mitades como en el truco de dos semicírculos.
- */
 export function ProgressRing({
   size = 64,
   stroke = 6,
@@ -52,7 +44,6 @@ export function ProgressRing({
             strokeLinecap="round"
             fill="none"
             strokeDasharray={`${circumference * clamped} ${circumference}`}
-            // Sin girar, el trazo arranca a las 3 en punto.
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
         ) : null}

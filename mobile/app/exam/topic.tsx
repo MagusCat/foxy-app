@@ -36,14 +36,12 @@ const ROW_HEIGHT = 118;
 const SEPARATOR_HEIGHT = 58;
 const CORNER = 16;
 
-/** Zigzag suave: los nodos no caen en columna, se van desviando. */
 const X_PATTERN = [0.5, 0.68, 0.42, 0.56, 0.72, 0.38];
 
 type TreeItem =
   | { kind: 'separator'; id: string; level: number; y: number }
   | { kind: 'node'; id: string; lesson: PlanLesson; index: number; x: number; cy: number };
 
-/** Codo redondeado de un nodo al siguiente. */
 function connector(x0: number, y0: number, x1: number, y1: number) {
   if (Math.abs(x1 - x0) < 1) return `M ${x0} ${y0} V ${y1}`;
 
@@ -79,10 +77,6 @@ export default function TopicScreen() {
   const topic = plan?.topics.find((item) => item.id === topicId);
   const treeWidth = width - 40;
 
-  /**
-   * Se calcula la posición de todo el árbol de una vez: los conectores
-   * necesitan saber dónde cae el nodo siguiente antes de pintarse.
-   */
   const { items, height } = useMemo(() => {
     if (!topic) return { items: [] as TreeItem[], height: 0 };
 
@@ -112,7 +106,6 @@ export default function TopicScreen() {
     return { items: result, height: y };
   }, [topic, treeWidth]);
 
-  /** Solo se une lo que está seguido: un cambio de nivel corta la línea. */
   const paths = useMemo(() => {
     const lines: string[] = [];
     for (let index = 0; index < items.length - 1; index += 1) {
@@ -124,8 +117,6 @@ export default function TopicScreen() {
     return lines;
   }, [items]);
 
-  // Igual que en la preparación: no se anuncia que el tema no existe hasta
-  // haber terminado de leer del disco.
   if (!topic && !hydrated) {
     return <View className="flex-1 bg-bg-light dark:bg-bg-dark" />;
   }
@@ -188,7 +179,6 @@ export default function TopicScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      {/* BARRA SUPERIOR: volver a la izquierda, el resto junto a la derecha. */}
       <View
         className="flex-row items-center px-5 pb-3"
         style={{ paddingTop: padding.top, backgroundColor: colors.background, zIndex: 20 }}
@@ -239,7 +229,6 @@ export default function TopicScreen() {
         </View>
       </View>
 
-      {/* CABECERA COMPACTA: aparece al bajar */}
       <Animated.View
         pointerEvents="none"
         style={{
@@ -289,7 +278,6 @@ export default function TopicScreen() {
           useNativeDriver: true,
         })}
       >
-        {/* CABECERA GRANDE */}
         <Animated.View className="items-center px-5 pb-2 pt-3" style={{ opacity: headerOpacity }}>
           <Text className="text-[10px] font-bold uppercase tracking-wider text-text-secondary-light dark:text-text-secondary-dark">
             Tema y dominio
@@ -323,7 +311,6 @@ export default function TopicScreen() {
           </View>
         </Animated.View>
 
-        {/* ÁRBOL DE LECCIONES */}
         <View className="mt-4 px-5">
           <View style={{ width: treeWidth, height }}>
             <Svg
@@ -381,7 +368,6 @@ export default function TopicScreen() {
                     left: item.x - NODE / 2,
                     height: NODE,
                     width: NODE,
-                    // Todas redondas: el árbol se lee como una ruta de burbujas.
                     borderRadius: NODE / 2,
                     backgroundColor: isDone ? '#10B981' : colors.card,
                     borderWidth: isCurrent ? 2.5 : 1.5,
@@ -434,7 +420,6 @@ export default function TopicScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* HOJA: DETALLE DE LA LECCIÓN */}
       <Modal
         visible={openLesson !== null}
         transparent
@@ -500,7 +485,6 @@ export default function TopicScreen() {
         </View>
       </Modal>
 
-      {/* HOJA: SIGUIENTE LECCIÓN, ya centrada en este tema */}
       <NextLessonSheet
         visible={isLessonSheetVisible}
         onClose={() => setLessonSheetVisible(false)}
