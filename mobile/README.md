@@ -1,4 +1,10 @@
-# Fox 🦊 — app móvil
+# Fox 🦊 — app Android
+
+**Aplicación móvil para Android.** Teléfono en vertical, y nada más: no es una
+app de escritorio, ni una web, ni está pensada para tablet. Cada decisión de
+interfaz —el alto de los objetivos táctiles, las hojas que suben desde abajo,
+el hueco que deja el teclado, la barra de pestañas flotante— está tomada para
+una mano sobre un teléfono Android.
 
 App de estudio para estudiantes de secundaria y universidad. Reúne en un solo
 sitio las cuatro cosas que un estudiante hace a diario: preguntar dudas,
@@ -6,6 +12,28 @@ preparar exámenes, seguir sus clases y medir el tiempo que dedica a estudiar.
 
 Expo SDK 54 · React Native 0.81 (nueva arquitectura) · expo-router ·
 NativeWind 4 · TypeScript estricto.
+
+## Plataforma
+
+Android es el objetivo. El paquete es `com.anonymous.mobile`, la orientación
+está fijada en vertical y `app.json` activa `edgeToEdgeEnabled`, así que la app
+dibuja por debajo de la barra de estado y de la de navegación: los márgenes
+seguros salen siempre de `useSafeAreaInsets`, nunca de valores a ojo.
+
+Hay dos consecuencias de Android que conviene tener presentes al tocar código:
+
+- **El teclado no reajusta la ventana.** Y el alto que informa el evento del
+  teclado deja fuera la barra de navegación. Cualquier cosa anclada al borde
+  inferior tiene que usar `useSheetPaddingBottom()`, que ya suma
+  `insets.bottom`.
+- **La galería devuelve nombres opacos** del estilo
+  `79bac03b-5d84-4dae-b0a0-38f243297846.jpeg`, y deja los archivos en una caché
+  que el sistema puede vaciar. De ahí `isOpaqueFileName` y `persistMedia`.
+
+El código de iOS que hay (alturas táctiles algo mayores, `logo-apple` en el
+inicio de sesión) está por si la app se publica también ahí, pero no es la
+plataforma que se prueba. La build web existe únicamente como herramienta de
+desarrollo para inspeccionar layout desde el escritorio; no es un destino.
 
 ## Empezar
 
@@ -17,8 +45,8 @@ npm install
 npm start
 ```
 
-Escanea el QR con Expo Go, o pulsa `a` / `i` para abrir un emulador. Para
-compilar el paquete nativo:
+Escanea el QR con Expo Go en el teléfono, o pulsa `a` para abrir un emulador
+Android. Para compilar el paquete nativo:
 
 ```bash
 npm run android
@@ -28,10 +56,31 @@ Otros comandos:
 
 | Comando | Para qué |
 | --- | --- |
-| `npm run web` | Levanta la app en el navegador (útil para inspeccionar layout) |
+| `npm run web` | Levanta la app en el navegador, solo para inspeccionar layout |
 | `npm run lint` | ESLint con la configuración de Expo |
 | `npx tsc --noEmit` | Comprueba tipos sin generar nada |
-| `npx expo export --platform android` | Empaqueta todo el grafo; detecta imports roto antes de probar en el teléfono |
+| `npx expo export --platform android` | Empaqueta todo el grafo; detecta imports rotos antes de probar en el teléfono |
+
+### Probar en un teléfono conectado
+
+Con el móvil en depuración USB, el ciclo corto es levantar Metro y abrirlo por
+enlace profundo, sin tocar el QR:
+
+```bash
+adb shell am start -a android.intent.action.VIEW -d "exp://<IP-DEL-PC>:8081"
+```
+
+Para entrar directamente a una pantalla concreta se le añade la ruta:
+
+```bash
+adb shell am start -a android.intent.action.VIEW -d "exp://<IP-DEL-PC>:8081/--/exam/new"
+```
+
+Y para ver qué está pasando en pantalla:
+
+```bash
+adb exec-out screencap -p > captura.png
+```
 
 ## Estructura
 
@@ -266,6 +315,8 @@ de Android devuelve como identificadores.
 
 ## Convenciones
 
+- Android en vertical es el único destino que se prueba; el layout se valida en
+  un teléfono real, no en el navegador.
 - Interfaz en español, incluidas las etiquetas de accesibilidad.
 - Todo control interactivo lleva `accessibilityRole` y `accessibilityLabel`; los
   que tienen estado añaden `accessibilityState`.
