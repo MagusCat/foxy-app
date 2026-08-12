@@ -25,7 +25,6 @@ import { useTheme } from '@/contexts/theme-context';
 import { localDay } from '@/hooks/use-agenda';
 import { describeAttachment, useAttachments } from '@/hooks/use-attachments';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { useStudyActivity } from '@/hooks/use-study-activity';
@@ -259,7 +258,6 @@ export default function NewExamScreen() {
   const padding = useScreenPadding();
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const keyboardHeight = useKeyboardHeight();
   const sheetPaddingBottom = useSheetPaddingBottom();
 
   const { createPlan } = useStudyPlans();
@@ -1046,13 +1044,17 @@ export default function NewExamScreen() {
         ) : null}
       </ScrollView>
 
-      {/* PIE: CONTINUAR */}
+      {/* PIE: CONTINUAR
+          El hueco de abajo sale del mismo hook que usan las hojas: en Android
+          la ventana no se reajusta con el teclado y el alto que informa el
+          evento deja fuera la barra de navegación, así que el botón se
+          quedaba tapado si solo se sumaba el teclado. */}
       <View
         className="border-t px-5 pt-3"
         style={{
           borderColor: colors.cardBorder,
           backgroundColor: colors.background,
-          paddingBottom: keyboardHeight > 0 ? 12 : padding.stackBottom,
+          paddingBottom: sheetPaddingBottom,
         }}
       >
         <TouchableOpacity

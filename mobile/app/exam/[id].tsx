@@ -43,23 +43,50 @@ function DayStrip({ examDate }: { examDate: string }) {
   const { colors } = useTheme();
   const today = localDay(new Date());
 
-  const days = useMemo(
-    () =>
-      Array.from({ length: 14 }, (_, index) => {
-        const date = new Date();
-        date.setDate(date.getDate() + index - 3);
-        const key = localDay(date);
-        return {
-          key,
-          number: date.getDate(),
-          weekday: WEEKDAY_SHORT[date.getDay()],
-          isToday: key === today,
-          isPast: key < today,
-          isExam: key === examDate,
-        };
-      }),
-    [examDate, today],
-  );
+  const days = useMemo(() => {
+    const window = Array.from({ length: 14 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() + index - 3);
+      const key = localDay(date);
+      return {
+        key,
+        number: date.getDate(),
+        weekday: WEEKDAY_SHORT[date.getDay()],
+        isToday: key === today,
+        isPast: key < today,
+        isExam: key === examDate,
+        isBreak: false,
+      };
+    });
+
+    // Un examen a meses vista cae fuera de la ventana y la tira quedaba sin
+    // birrete: se engancha al final, separado, para que siga estando a la
+    // vista sin dibujar los cien días de en medio.
+    if (window.some((day) => day.isExam) || examDate < today) return window;
+
+    const exam = new Date(`${examDate}T00:00:00`);
+    return [
+      ...window,
+      {
+        key: 'break',
+        number: 0,
+        weekday: '',
+        isToday: false,
+        isPast: false,
+        isExam: false,
+        isBreak: true,
+      },
+      {
+        key: examDate,
+        number: exam.getDate(),
+        weekday: WEEKDAY_SHORT[exam.getDay()],
+        isToday: false,
+        isPast: false,
+        isExam: true,
+        isBreak: false,
+      },
+    ];
+  }, [examDate, today]);
 
   return (
     <ScrollView
@@ -67,7 +94,14 @@ function DayStrip({ examDate }: { examDate: string }) {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
     >
-      {days.map((day) => (
+      {days.map((day) =>
+        day.isBreak ? (
+          <View key={day.key} className="h-[38px] w-3 justify-end self-end">
+            <Text className="pb-2.5 text-[13px]" style={{ color: colors.icon }}>
+              ···
+            </Text>
+          </View>
+        ) : (
         <View key={day.key} className="w-[38px] items-center">
           <Text className="mb-1.5 text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
             {day.weekday}
@@ -99,7 +133,8 @@ function DayStrip({ examDate }: { examDate: string }) {
             )}
           </View>
         </View>
-      ))}
+        ),
+      )}
     </ScrollView>
   );
 }

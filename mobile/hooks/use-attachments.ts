@@ -12,6 +12,7 @@ import {
   getExtension,
   imageExtensionFromMime,
   isAllowedDocument,
+  isOpaqueFileName,
 } from '@/constants/attachments';
 
 export type Attachment = {
@@ -166,13 +167,18 @@ export function useAttachments() {
       }
 
       const accepted = addAttachments(
-        assets.map((asset, index) => ({
-          kind: 'image' as const,
-          uri: asset.uri,
-          name: asset.fileName || `Imagen ${index + 1}.${imageExtensionFromMime(asset.mimeType)}`,
-          mimeType: asset.mimeType,
-          size: asset.fileSize,
-        })),
+        assets.map((asset, index) => {
+          const extension = imageExtensionFromMime(asset.mimeType);
+          const fallback = `Imagen ${index + 1}.${extension}`;
+
+          return {
+            kind: 'image' as const,
+            uri: asset.uri,
+            name: asset.fileName && !isOpaqueFileName(asset.fileName) ? asset.fileName : fallback,
+            mimeType: asset.mimeType,
+            size: asset.fileSize,
+          };
+        }),
       );
       warnIfTrimmed(assets.length, accepted);
     } catch (error) {
