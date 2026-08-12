@@ -8,8 +8,9 @@ import { TabHeader, useScreenPadding } from '@/components/screen-header';
 import { Card, CardDivider, Row, SectionTitle, softTint } from '@/components/settings-ui';
 import { buildAchievements, countUnlocked } from '@/constants/achievements';
 import { Palette } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { ThemePreference, useTheme } from '@/contexts/theme-context';
-import { clearPersistedState, usePersistentState, SESSION_KEYS } from '@/hooks/use-persistent-state';
+import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useStudyActivity, formatMinutes } from '@/hooks/use-study-activity';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const padding = useScreenPadding();
   const router = useRouter();
   const { isDark, colors, preference, setPreference } = useTheme();
+  const { signOut } = useAuth();
 
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
   const [school] = usePersistentState('foxy:school', '');
@@ -70,11 +72,9 @@ export default function ProfileScreen() {
         {
           text: 'Cerrar sesión',
           style: 'destructive',
-          onPress: async () => {
-            await clearPersistedState(SESSION_KEYS);
-            router.replace('/(tabs)');
-            Alert.alert('Sesión cerrada', '¡Nos vemos pronto! Foxy te espera para seguir estudiando.');
-          },
+          // El gate del layout raíz ve que ya no hay sesión y lleva solo a la
+          // pantalla de entrada: aquí no hace falta navegar a mano.
+          onPress: () => signOut(),
         },
       ],
     );
