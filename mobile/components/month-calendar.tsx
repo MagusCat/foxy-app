@@ -7,12 +7,9 @@ import { useTheme } from '@/contexts/theme-context';
 import { buildMonthGrid, localDay, MONTH_NAMES, WEEKDAY_LABELS } from '@/hooks/use-agenda';
 
 type MonthCalendarProps = {
-  /** Día del examen: se marca con el birrete. */
   examDay?: string;
-  /** Día elegido, cuando el calendario sirve para escoger fecha. */
   selectedDay?: string;
   onSelectDay?: (day: string) => void;
-  /** Bloquea todo lo anterior a hoy (elegir la fecha del examen). */
   disablePast?: boolean;
   accent?: string;
 };
@@ -27,7 +24,6 @@ export function MonthCalendar({
   const { colors, isDark } = useTheme();
   const today = localDay(new Date());
 
-  // El mes que se ve arranca en el del día elegido, no siempre en el actual.
   const anchor = new Date(`${selectedDay ?? examDay ?? today}T00:00:00`);
   const [cursor, setCursor] = useState({ year: anchor.getFullYear(), month: anchor.getMonth() });
 

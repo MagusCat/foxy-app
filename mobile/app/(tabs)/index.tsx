@@ -108,7 +108,7 @@ export default function HomeScreen() {
     threadRef.current?.scrollToEnd({ animated: true });
   }, [hasChat]);
 
-  /** Respuesta pendiente de Foxy, para poder cancelarla al desmontar. */
+
   const replyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const {
     attachments,
@@ -202,19 +202,13 @@ export default function HomeScreen() {
     });
     addQuestion({ text, subject: selectedSubject, mode: answerMode, images, files });
 
-    // El mensaje entra en el hilo, no solo en el historial: la pantalla pasa
-    // a modo conversación en cuanto hay uno.
     sendToChat(text, selectedSubject, sentAttachments);
 
     setInputMessage('');
     clearAttachments();
 
-    // Enviar cuenta como ponerse a estudiar: arranca el temporizador si no
-    // había ninguno en marcha y a partir de ahí se ve arriba, en la barra.
     if (!focus.isRunning) focus.start();
 
-    // Foxy tarda un momento en "escribir". Sin IA la respuesta es fija, pero
-    // contestar en el mismo tick hace que parezca que no ha leído nada.
     setFoxyTyping(true);
     replyTimer.current = setTimeout(() => {
       setFoxyTyping(false);
@@ -222,7 +216,6 @@ export default function HomeScreen() {
     }, 900);
   };
 
-  // Si se sale de la pantalla a media respuesta, el temporizador se cancela.
   useEffect(() => () => clearTimeout(replyTimer.current), []);
 
   const handleNewChat = () => {
@@ -281,8 +274,6 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      {/* BARRA SUPERIOR: fija. En una conversación larga tiene que seguir
-          ahí para volver al perfil o ver la racha sin subir del todo. */}
       <View className="px-5" style={{ paddingTop: padding.top }}>
         <View className="flex-row items-center justify-between pb-4">
           <View className="mr-2 flex-1 flex-row items-center gap-2">
@@ -356,7 +347,6 @@ export default function HomeScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Con conversación abierta se puede empezar otra desde aquí. */}
           {hasChat ? (
             <TouchableOpacity
               className={`${HEADER_PILL} ml-2 aspect-square items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
@@ -419,9 +409,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <View className="mt-7 w-full gap-2">
-            {/* Con el temporizador en marcha esta tarjeta sobra: la cuenta ya
-                se ve arriba, en la barra, y aquí solo repetiría lo mismo en
-                medio de la pantalla. */}
             {focus.isRunning ? null : (
               <TouchableOpacity
                 className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
@@ -505,7 +492,6 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* PANEL DE ENTRADA: anclado abajo, para que no se vaya con el hilo. */}
       <View
         className="w-full items-center px-5"
         style={{ paddingBottom: keyboardHeight > 0 ? sheetPaddingBottom : padding.tabBottom - 22 }}

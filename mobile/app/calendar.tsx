@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -13,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useScreenPadding } from '@/components/screen-header';
+import { TimePickerSheet } from '@/components/time-picker-sheet';
 import { ChipGroup, softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
@@ -29,6 +29,7 @@ import {
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { useStudyPlans } from '@/hooks/use-study-plans';
+import { formatTime12 } from '@/lib/time';
 
 const WEEKDAYS = ['lu', 'ma', 'mi', 'ju', 'vi', 'sá', 'do'];
 
@@ -54,7 +55,6 @@ type CalendarItem = {
   date: string;
   time?: string;
   kind: EventKind;
-  /** De dónde sale: agenda propia o el examen de una preparación. */
   source: 'evento' | 'plan';
   planId?: string;
 };
@@ -78,17 +78,12 @@ export default function CalendarScreen() {
   const [selectedDay, setSelectedDay] = useState(today);
 
   const [isEventModalVisible, setEventModalVisible] = useState(false);
+  const [isTimeVisible, setTimeVisible] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventKind, setEventKind] = useState<EventKind>('examen');
   const [eventSubject, setEventSubject] = useState(subjects[0] ?? 'Matemáticas');
   const [eventTime, setEventTime] = useState('');
 
-  /**
-   * El calendario junta las dos cosas que tienen fecha: los eventos que
-   * apunta el usuario y el día del examen de cada preparación. Antes las
-   * preparaciones no aparecían por ningún lado, que es lo primero que uno
-   * viene a mirar aquí.
-   */
   const items = useMemo<CalendarItem[]>(() => {
     const fromEvents: CalendarItem[] = events.map((event) => ({
       id: event.id,
@@ -156,13 +151,13 @@ export default function CalendarScreen() {
       return;
     }
 
-    const time = eventTime.trim();
-    if (time && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) {
-      Alert.alert('Hora no válida', 'Usa el formato de 24 horas, por ejemplo 08:30 o 17:45.');
-      return;
-    }
-
-    addEvent({ title, subject: eventSubject, kind: eventKind, date: selectedDay, time: time || undefined });
+    addEvent({
+      title,
+      subject: eventSubject,
+      kind: eventKind,
+      date: selectedDay,
+      time: eventTime || undefined,
+    });
     setEventModalVisible(false);
   };
 
@@ -188,23 +183,26 @@ export default function CalendarScreen() {
         contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.stackBottom }}
         showsVerticalScrollIndicator={false}
       >
-        {/* CABECERA */}
         <View className="px-5">
           <View className="flex-row items-center">
-            <TouchableOpacity
-              className="h-10 w-10 items-center justify-center rounded-full border"
-              style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Volver"
-              onPress={() => router.back()}
-            >
-              <Ionicons name="chevron-back" size={19} color={colors.text} />
-            </TouchableOpacity>
+            <View className="w-10">
+              <TouchableOpacity
+                className="h-10 w-10 items-center justify-center rounded-full border"
+                style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Volver"
+                onPress={() => router.back()}
+              >
+                <Ionicons name="chevron-back" size={19} color={colors.text} />
+              </TouchableOpacity>
+            </View>
 
-            <Text className="-ml-10 flex-1 text-center text-[24px] font-bold text-text-primary-light dark:text-text-primary-dark">
+            <Text className="flex-1 text-center text-[24px] font-bold text-text-primary-light dark:text-text-primary-dark">
               Mi calendario
             </Text>
+
+            <View className="w-10" />
           </View>
 
           <TouchableOpacity
@@ -220,7 +218,6 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* FILTROS */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -250,7 +247,6 @@ export default function CalendarScreen() {
           })}
         </ScrollView>
 
-        {/* MES */}
         <View className="mt-4 px-5">
           <View
             className="rounded-[20px] border p-4"
@@ -352,7 +348,6 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {/* DÍA ELEGIDO */}
         {selectedItems.length > 0 ? (
           <View className="mt-6 px-5">
             <Text className="mb-3 text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -364,7 +359,6 @@ export default function CalendarScreen() {
           </View>
         ) : null}
 
-        {/* PRÓXIMOS */}
         <View className="mt-6 px-5">
           <Text className="mb-3 text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
             Próximos
@@ -393,7 +387,6 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
 
-      {/* MODAL: NUEVO EVENTO */}
       <Modal
         visible={isEventModalVisible}
         transparent
@@ -460,16 +453,37 @@ export default function CalendarScreen() {
               <Text className="mb-2 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
                 Hora (opcional)
               </Text>
-              <TextInput
-                className="mb-3 rounded-[14px] border px-3.5 py-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
-                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
-                placeholder="08:30"
-                placeholderTextColor={colors.icon}
-                value={eventTime}
-                onChangeText={setEventTime}
-                keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                maxLength={5}
-              />
+              <View className="mb-3 flex-row items-center gap-2">
+                <TouchableOpacity
+                  className="flex-1 flex-row items-center rounded-[14px] border px-3.5 py-3"
+                  style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Elegir la hora del evento"
+                  onPress={() => setTimeVisible(true)}
+                >
+                  <Ionicons name="time-outline" size={17} color={colors.icon} />
+                  <Text
+                    className="ml-2.5 flex-1 text-sm"
+                    style={{ color: eventTime ? colors.text : colors.icon }}
+                  >
+                    {eventTime ? formatTime12(eventTime) : 'Sin hora'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.icon} />
+                </TouchableOpacity>
+
+                {eventTime ? (
+                  <TouchableOpacity
+                    className="h-11 w-11 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.surface }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Quitar la hora"
+                    onPress={() => setEventTime('')}
+                  >
+                    <Ionicons name="close" size={17} color={colors.icon} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </ScrollView>
 
             <TouchableOpacity
@@ -485,11 +499,22 @@ export default function CalendarScreen() {
           </View>
         </View>
       </Modal>
+
+      <TimePickerSheet
+        visible={isTimeVisible}
+        title="Hora del evento"
+        description="Desliza para elegir la hora"
+        value={eventTime || '08:00'}
+        onCancel={() => setTimeVisible(false)}
+        onSave={(time) => {
+          setEventTime(time);
+          setTimeVisible(false);
+        }}
+      />
     </View>
   );
 }
 
-/** Fila de "Próximos": el día a la izquierda, con la materia y el título. */
 function CalendarRow({ item, onPress }: { item: CalendarItem; onPress: () => void }) {
   const { colors, isDark } = useTheme();
   const accent = getSubjectAccent(item.subject, isDark);

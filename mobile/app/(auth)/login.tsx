@@ -11,7 +11,6 @@ import { useTheme } from '@/contexts/theme-context';
 type ProviderButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  /** El botón destacado de la pantalla: relleno rojo y texto blanco. */
   primary?: boolean;
   onPress: () => void;
 };
@@ -36,8 +35,6 @@ function ProviderButton({ icon, label, primary, onPress }: ProviderButtonProps) 
       <Text
         className="text-[13px] font-bold uppercase tracking-wider"
         style={{ color: foreground }}
-        // El botón tiene alto fijo: sin tope, una fuente grande del sistema
-        // parte la etiqueta en dos líneas y se sale de la píldora.
         maxFontSizeMultiplier={1.2}
         numberOfLines={1}
       >
@@ -47,7 +44,6 @@ function ProviderButton({ icon, label, primary, onPress }: ProviderButtonProps) 
   );
 }
 
-/** Enlace legal. Los documentos todavía no están publicados. */
 function LegalLink({ label }: { label: string }) {
   return (
     <Text
@@ -70,21 +66,12 @@ export default function LoginScreen() {
   const { colors } = useTheme();
   const { signIn } = useAuth();
 
-  /**
-   * TODO(auth): aquí va el flujo real de cada proveedor (expo-auth-session
-   * para Google, expo-apple-authentication para Apple y una pantalla propia
-   * para el correo). Por ahora solo se abre la sesión local: el gate del
-   * layout raíz ve `isSignedIn` y manda a las pestañas.
-   */
   const handleSignIn = (provider: AuthProvider) => {
     signIn(provider);
   };
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      {/* Con scroll el bloque de botones nunca queda fuera de pantalla en
-          móviles bajos o con la fuente del sistema en grande; `flexGrow`
-          mantiene el logo centrado cuando sí hay sitio de sobra. */}
       <ScrollView
         className="px-6"
         contentContainerStyle={{
@@ -95,7 +82,6 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* HUECO DEL LOGO: se lleva el espacio libre de la mitad superior. */}
         <View className="flex-1 items-center justify-center py-10" style={{ minHeight: 140 }}>
           <BrandLogo size={64} withWordmark />
         </View>
@@ -113,8 +99,6 @@ export default function LoginScreen() {
           onPress={() => handleSignIn('google')}
         />
 
-        {/* Apple solo tiene sentido en iOS: en Android no hay a quién pedirle
-            la identidad. */}
         {Platform.OS === 'ios' ? (
           <ProviderButton
             icon="logo-apple"

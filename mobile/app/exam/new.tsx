@@ -20,6 +20,7 @@ import { useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
 import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
 import { getSubjectAccent } from '@/constants/subject-colors';
+import { mergeSubjects } from '@/constants/subjects';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { localDay } from '@/hooks/use-agenda';
@@ -29,17 +30,7 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { useStudyActivity } from '@/hooks/use-study-activity';
 import { formatExamDate, useStudyPlans, type PlanMaterial } from '@/hooks/use-study-plans';
-
-/** Materias que Foxy ya conoce. El usuario puede añadir las suyas. */
-const SUBJECT_CATALOG = [
-  'Matemáticas', 'Álgebra', 'Geometría', 'Cálculo', 'Estadística', 'Física', 'Química',
-  'Química Orgánica', 'Biología', 'Anatomía', 'Ciencias Naturales', 'Informática',
-  'Programación', 'Bases de datos', 'Minería de datos', 'Redes', 'Inglés', 'Español',
-  'Literatura', 'Francés', 'Alemán', 'Portugués', 'Historia', 'Geografía', 'Cívica',
-  'Filosofía', 'Psicología', 'Sociología', 'Economía', 'Contabilidad', 'Administración',
-  'Derecho', 'Marketing', 'Arte', 'Música', 'Educación Física', 'Enfermería', 'Medicina',
-  'Ingeniería', 'Arquitectura',
-];
+import { persistMedia } from '@/lib/media';
 
 const LANGUAGES = [
   { value: 'Español', hint: 'El examen y las lecciones en español' },
@@ -98,8 +89,6 @@ function addDays(amount: number) {
   return localDay(date);
 }
 
-// ---------------------------------------------------------------------------
-
 function StepTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <View className="mb-5">
@@ -127,7 +116,6 @@ function SelectableRow({
   hint?: string;
   selected: boolean;
   accent: string;
-  /** Cuadrado para varias respuestas, círculo para una sola. */
   multi?: boolean;
   onPress: () => void;
 }) {
@@ -171,11 +159,6 @@ function SelectableRow({
   );
 }
 
-/**
- * Pantalla de espera con barra y mensajes que van cambiando. Todavía no hay
- * IA detrás: el tiempo es fijo y lo que importa es contar qué se está
- * preparando para que la espera no parezca vacía.
- */
 function PreparingView({
   messages,
   durationMs,
@@ -196,7 +179,6 @@ function PreparingView({
       toValue: 1,
       duration: durationMs,
       easing: Easing.inOut(Easing.quad),
-      // La barra anima `width`, que no vive en el hilo de UI nativo.
       useNativeDriver: false,
     }).start();
 
@@ -252,8 +234,6 @@ function PreparingView({
   );
 }
 
-// ---------------------------------------------------------------------------
-
 export default function NewExamScreen() {
   const padding = useScreenPadding();
   const router = useRouter();
@@ -286,7 +266,6 @@ export default function NewExamScreen() {
   const [pasteDraft, setPasteDraft] = useState('');
 
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  /** Mientras se arrastra el dial el scroll se bloquea, o se lleva el gesto. */
   const [isDialActive, setDialActive] = useState(false);
 
   const accent = useMemo(
@@ -294,16 +273,7 @@ export default function NewExamScreen() {
     [subject, isDark],
   );
 
-  /** El catálogo, más lo que el usuario ya tenía guardado, sin repetir. */
-  const allSubjects = useMemo(() => {
-    const seen = new Set<string>();
-    return [...savedSubjects, ...SUBJECT_CATALOG].filter((item) => {
-      const key = item.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [savedSubjects]);
+  const allSubjects = useMemo(() => mergeSubjects(savedSubjects), [savedSubjects]);
 
   const filteredSubjects = useMemo(() => {
     const query = subjectQuery.trim().toLowerCase();
@@ -347,8 +317,6 @@ export default function NewExamScreen() {
     if (!trimmed) return;
 
     if (!allSubjects.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
-      // Se guarda en la misma lista que usa Preguntar: la materia que creas
-      // aquí queda disponible en toda la app.
       setSavedSubjects((prev) => [...prev, trimmed]);
     }
     setSubject(trimmed);
@@ -393,7 +361,7 @@ export default function NewExamScreen() {
         id: item.id,
         kind: item.kind,
         name: item.name,
-        uri: item.uri,
+        uri: persistMedia(item.uri, item.kind),
         size: item.size,
       })),
       ...pastedTexts.map((item) => ({
@@ -414,14 +382,11 @@ export default function NewExamScreen() {
       survey: SURVEY.flatMap((block) => answers[block.id] ?? []),
     });
 
-    // Crear el plan es actividad real: cuenta para la racha y el historial.
     markStudied();
     logSession({ kind: 'exam', subject, title: plan.title, minutes: 10 });
 
     router.replace({ pathname: '/exam/[id]', params: { id: plan.id } });
   };
-
-  // -------------------------------------------------------------------------
 
   if (step === 'preparing' || step === 'finishing') {
     const isFirst = step === 'preparing';
@@ -443,7 +408,6 @@ export default function NewExamScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      {/* ENCABEZADO: volver y en qué paso vas */}
       <View className="flex-row items-center px-5 pb-4" style={{ paddingTop: padding.top }}>
         <TouchableOpacity
           className="mr-3 h-9 w-9 items-center justify-center rounded-full border"
@@ -486,7 +450,6 @@ export default function NewExamScreen() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!isDialActive}
       >
-        {/* PASO 1: MATERIA ---------------------------------------------- */}
         {step === 'subject' ? (
           <>
             <StepTitle
@@ -627,7 +590,6 @@ export default function NewExamScreen() {
           </>
         ) : null}
 
-        {/* PASO 2: FECHA ------------------------------------------------ */}
         {step === 'date' ? (
           <>
             <StepTitle
@@ -778,7 +740,6 @@ export default function NewExamScreen() {
           </>
         ) : null}
 
-        {/* PASO 3: CALIFICACIÓN ----------------------------------------- */}
         {step === 'grade' ? (
           <>
             <StepTitle
@@ -811,7 +772,6 @@ export default function NewExamScreen() {
           </>
         ) : null}
 
-        {/* PASO 4: MATERIAL --------------------------------------------- */}
         {step === 'materials' ? (
           <>
             <StepTitle
@@ -956,7 +916,6 @@ export default function NewExamScreen() {
               </View>
             ) : null}
 
-            {/* OPCIÓN DE PAGO, TODAVÍA CERRADA */}
             <TouchableOpacity
               className="mt-5 flex-row items-center rounded-2xl border p-4"
               style={{ backgroundColor: colors.card, borderColor: colors.cardBorder, opacity: 0.75 }}
@@ -1002,7 +961,6 @@ export default function NewExamScreen() {
           </>
         ) : null}
 
-        {/* PASO 5: IDIOMA ----------------------------------------------- */}
         {step === 'language' ? (
           <>
             <StepTitle
@@ -1023,7 +981,6 @@ export default function NewExamScreen() {
           </>
         ) : null}
 
-        {/* ENCUESTA ------------------------------------------------------ */}
         {step === 'survey' ? (
           <>
             <StepTitle
@@ -1052,11 +1009,6 @@ export default function NewExamScreen() {
         ) : null}
       </ScrollView>
 
-      {/* PIE: CONTINUAR
-          El hueco de abajo sale del mismo hook que usan las hojas: en Android
-          la ventana no se reajusta con el teclado y el alto que informa el
-          evento deja fuera la barra de navegación, así que el botón se
-          quedaba tapado si solo se sumaba el teclado. */}
       <View
         className="border-t px-5 pt-3"
         style={{
@@ -1084,7 +1036,6 @@ export default function NewExamScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* MODAL: PEGAR TEXTO */}
       <Modal
         visible={isPasteVisible}
         transparent

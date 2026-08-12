@@ -5,15 +5,8 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 
 export type FocusSession = {
   minutes: number;
-  /** Marca de tiempo del final. `null` significa parado. */
   endsAt: number | null;
-  /** Segundos que quedaban al pausar. Solo se usa con `endsAt` en null. */
   remaining: number;
-  /**
-   * Minutos de una sesión que llegó a cero y todavía nadie ha apuntado en la
-   * actividad. Lo vacía `useFocusCompletion`, que corre una sola vez en la
-   * raíz de la app.
-   */
   finished?: number | null;
 };
 
@@ -28,11 +21,6 @@ const DEFAULT_SESSION: FocusSession = {
   finished: null,
 };
 
-/**
- * Una sesión guardada de una versión anterior (o a medio escribir) podía
- * llegar con campos que no son números. Sin esto el reloj mostraba `NaN:NaN`
- * o se quedaba clavado, que es justo lo que se veía.
- */
 function normalize(session: FocusSession | null | undefined): FocusSession {
   const minutes =
     typeof session?.minutes === 'number' && session.minutes > 0
@@ -79,8 +67,6 @@ export function useFocusSession() {
     [setRaw],
   );
 
-  // El reloj se recalcula siempre desde la marca de tiempo: los `setInterval`
-  // se congelan en segundo plano y restar segundos dejaba la cuenta atrasada.
   useEffect(() => {
     const tick = () => setSecondsLeft(secondsLeftOf(raw));
 
@@ -98,15 +84,6 @@ export function useFocusSession() {
     };
   }, [raw]);
 
-  /**
-   * La sesión se cierra sola al llegar a cero, esté abierta la pantalla que
-   * esté. Antes solo lo hacía "Modo enfoque": si el temporizador vencía en
-   * cualquier otra pantalla, se quedaba clavado en 0:00 para siempre.
-   *
-   * La transición es idempotente a propósito: hay una instancia del hook por
-   * pantalla montada y todas intentan cerrarla, pero todas producen el mismo
-   * resultado, así que solo se guarda una vez.
-   */
   useEffect(() => {
     if (!hydrated || !isRunning || secondsLeft > 0) return;
 

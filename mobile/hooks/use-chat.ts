@@ -21,13 +21,6 @@ export type ChatMessage = {
   attachments?: ChatAttachment[];
 };
 
-/**
- * Respuesta provisional mientras no hay IA detrás.
- *
- * No se finge una explicación: se dice qué recibió y qué hará cuando esté
- * conectada. Hay varias redacciones para que dos preguntas seguidas no
- * devuelvan literalmente lo mismo.
- */
 const REPLIES = [
   (subject: string) =>
     `Ya tengo tu pregunta de ${subject}. Todavía no estoy conectado a la IA, así que aún no puedo resolverla: en cuanto lo esté, te la explico paso a paso aquí mismo.`,
@@ -67,7 +60,6 @@ export function useChat() {
     [setMessages],
   );
 
-  /** La respuesta llega aparte: la pantalla la pide tras el "escribiendo…". */
   const answer = useCallback(
     (subject: string, attachments: number) => {
       setMessages((prev) => {

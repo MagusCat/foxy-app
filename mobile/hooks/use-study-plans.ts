@@ -6,7 +6,6 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 
 export const STUDY_PLANS_KEY = 'foxy:study-plans';
 
-/** Lecciones que Foxy propone dentro de cada tema, en orden de dificultad. */
 export type LessonKind = 'intro' | 'practica' | 'quiz' | 'reto';
 
 export const LESSON_KIND_META: Record<
@@ -25,9 +24,7 @@ export type PlanMaterial = {
   id: string;
   kind: PlanMaterialKind;
   name: string;
-  /** Ruta local del archivo o la foto. El texto pegado no tiene. */
   uri?: string;
-  /** Solo para `text`: lo que el usuario pegó. */
   content?: string;
   size?: number;
 };
@@ -36,10 +33,8 @@ export type PlanLesson = {
   id: string;
   title: string;
   kind: LessonKind;
-  /** Nivel dentro del tema: separa el árbol en tramos. */
   level: number;
   done: boolean;
-  /** ISO del momento en que se terminó. Sirve para la meta diaria. */
   doneAt?: string;
 };
 
@@ -54,25 +49,16 @@ export type StudyPlan = {
   id: string;
   title: string;
   subject: string;
-  /** 'YYYY-MM-DD' */
   examDate: string;
-  /** 50 a 100 */
   targetGrade: number;
   language: string;
   createdAt: string;
   materials: PlanMaterial[];
   topics: PlanTopic[];
-  /** Respuestas de la encuesta previa. Hoy solo se guardan. */
   survey: string[];
-  /** Evita que otros puedan copiar la preparación. Sin cuentas, solo se guarda. */
   hidden?: boolean;
 };
 
-/**
- * Guion de temas mientras no hay backend. La IA los sacará del material que
- * suba el usuario; hasta entonces se arma una ruta creíble a partir del tema
- * y la materia, que es lo que necesita la pantalla de progreso.
- */
 const TOPIC_TEMPLATES = [
   'Planteamiento y conceptos base',
   'Tipos de problemas y cómo reconocerlos',
@@ -94,10 +80,6 @@ const LESSON_PLAN: { kind: LessonKind; level: number; title: string }[] = [
   { kind: 'reto', level: 3, title: 'Reto de dominio' },
 ];
 
-/**
- * Cuántos temas tiene sentido preparar según lo que falta para el examen: con
- * un día por delante conviene una ruta corta, y con dos semanas cabe entera.
- */
 function topicCountFor(examDate: string) {
   const left = daysUntil(examDate);
   if (left <= 1) return 5;
@@ -126,7 +108,6 @@ export type PlanProgress = {
   lessonsTotal: number;
   topicsDone: number;
   topicsTotal: number;
-  /** 0 a 1: nivel medio de dominio, lo que se muestra como porcentaje. */
   ratio: number;
   percent: number;
 };
@@ -153,32 +134,23 @@ export function topicProgress(topic: PlanTopic) {
   return { done, total: topic.lessons.length, ratio, percent: Math.round(ratio * 100) };
 }
 
-/** Un tema se abre cuando el anterior está terminado. El primero siempre. */
 export function isTopicUnlocked(plan: StudyPlan, index: number) {
   if (index <= 0) return true;
   return plan.topics[index - 1].lessons.every((lesson) => lesson.done);
 }
 
-/** Dentro del tema pasa lo mismo: se avanza en orden. */
 export function isLessonUnlocked(topic: PlanTopic, index: number) {
   if (index <= 0) return true;
   return topic.lessons[index - 1].done;
 }
 
-/** El tema por el que hay que seguir: el primero sin terminar. */
 export function nextTopicIndex(plan: StudyPlan) {
   const index = plan.topics.findIndex((topic) => topic.lessons.some((lesson) => !lesson.done));
   return index === -1 ? plan.topics.length - 1 : index;
 }
 
-/** Tope de la meta diaria: pedir más en un día desanima en vez de empujar. */
 const MAX_DAILY_LESSONS = 12;
 
-/**
- * Cuántas lecciones tocan hoy: lo que falta repartido entre los días que
- * quedan, con tope. Con el examen mañana saldrían todas de golpe, y una meta
- * imposible se abandona antes de empezar.
- */
 export function dailyLessonGoal(plan: StudyPlan) {
   const { lessonsDone, lessonsTotal } = planProgress(plan);
   const pending = lessonsTotal - lessonsDone;
@@ -201,13 +173,11 @@ export function formatExamDate(day: string) {
   return `${weekdays[date.getDay()]}, ${date.getDate()} de ${MONTH_NAMES[date.getMonth()].toLowerCase()}`;
 }
 
-/** "12 ago": fecha corta para las filas de datos, donde el día largo no cabe. */
 export function formatShortDate(day: string) {
   const date = new Date(`${day}T00:00:00`);
   return `${date.getDate()} ${MONTH_NAMES[date.getMonth()].toLowerCase().slice(0, 3)}`;
 }
 
-/** "mañana", "en 3 días", "hoy"… para el pie de las tarjetas. */
 export function describeCountdown(day: string) {
   const left = daysUntil(day);
   if (left < 0) return 'ya pasó';
@@ -280,7 +250,6 @@ export function useStudyPlans() {
     [updatePlan],
   );
 
-  /** Primero lo que está más cerca: el examen de mañana manda. */
   const sorted = useMemo(
     () => [...plans].sort((a, b) => a.examDate.localeCompare(b.examDate)),
     [plans],
