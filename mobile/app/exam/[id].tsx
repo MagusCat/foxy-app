@@ -7,6 +7,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { GoalBar } from '@/components/goal-bar';
 import { MonthCalendar } from '@/components/month-calendar';
+import { NextLessonSheet } from '@/components/next-lesson-sheet';
+import { PlanSettingsSheet } from '@/components/plan-settings-sheet';
 import { ProgressRing } from '@/components/progress-ring';
 import { useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
@@ -174,13 +176,15 @@ export default function ExamPlanScreen() {
   const { colors, isDark } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
 
-  const { plan, addMaterials, removePlan } = useStudyPlan(id);
+  const { plan, addMaterials, removePlan, updatePlan, hydrated } = useStudyPlan(id);
   const [, streak] = useDailyStreak();
   const [avatarUri] = usePersistentState('foxy:avatar', '');
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
 
   const [tab, setTab] = useState<TabKey>('temas');
   const [isAddVisible, setAddVisible] = useState(false);
+  const [isLessonSheetVisible, setLessonSheetVisible] = useState(false);
+  const [isSettingsVisible, setSettingsVisible] = useState(false);
 
   const picker = useAttachments();
   const { attachments, clearAttachments } = picker;
@@ -204,6 +208,12 @@ export default function ExamPlanScreen() {
     );
     clearAttachments();
   }, [attachments, plan, addMaterials, clearAttachments]);
+
+  // Leer del disco tarda un instante: sin esta espera se vería un "ya no
+  // existe" en cuanto se abre la pantalla, antes de cargar los planes.
+  if (!plan && !hydrated) {
+    return <View className="flex-1 bg-bg-light dark:bg-bg-dark" />;
+  }
 
   if (!plan) {
     return (
@@ -240,19 +250,6 @@ export default function ExamPlanScreen() {
     router.push({ pathname: '/exam/topic', params: { planId: plan.id, topicId } });
   };
 
-  const handleDeletePlan = () =>
-    Alert.alert('Eliminar preparación', `¿Eliminar "${plan.title}" y todo su progreso?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: () => {
-          removePlan(plan.id);
-          router.replace('/(tabs)/exams');
-        },
-      },
-    ]);
-
   const pickThen = (action: () => void) => {
     setAddVisible(false);
     setTimeout(action, 260);
@@ -270,8 +267,9 @@ export default function ExamPlanScreen() {
         contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.stackBottom }}
         showsVerticalScrollIndicator={false}
       >
-        {/* BARRA SUPERIOR */}
-        <View className="flex-row items-center justify-between px-5 pb-4">
+        {/* BARRA SUPERIOR: volver a la izquierda y todo lo demás junto a la
+            derecha, que es donde cae el pulgar. */}
+        <View className="flex-row items-center px-5 pb-4">
           <TouchableOpacity
             className="h-9 w-9 items-center justify-center rounded-full border"
             style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
@@ -283,21 +281,23 @@ export default function ExamPlanScreen() {
             <Ionicons name="chevron-back" size={18} color={colors.text} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            className="h-9 flex-row items-center rounded-full border px-4"
-            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Crear otra preparación de examen"
-            onPress={() => router.push('/exam/new')}
-          >
-            <Ionicons name="add" size={16} color={colors.text} />
-            <Text className="ml-1 text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-              Crear
-            </Text>
-          </TouchableOpacity>
+          <View className="flex-1" />
 
           <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              className="h-9 flex-row items-center rounded-full border px-4"
+              style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Crear una lección de esta preparación"
+              onPress={() => setLessonSheetVisible(true)}
+            >
+              <Ionicons name="add" size={16} color={colors.text} />
+              <Text className="ml-1 text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                Crear
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               className="h-9 w-9 items-center justify-center rounded-full border"
               style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
@@ -316,8 +316,8 @@ export default function ExamPlanScreen() {
               style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Más opciones"
-              onPress={handleDeletePlan}
+              accessibilityLabel="Información y ajustes de la preparación"
+              onPress={() => setSettingsVisible(true)}
             >
               <Ionicons name="ellipsis-vertical" size={17} color={colors.text} />
             </TouchableOpacity>
@@ -742,6 +742,30 @@ export default function ExamPlanScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* HOJA: SIGUIENTE LECCIÓN (botón Crear) */}
+      <NextLessonSheet
+        visible={isLessonSheetVisible}
+        onClose={() => setLessonSheetVisible(false)}
+        plan={plan}
+      />
+
+      {/* HOJA: INFORMACIÓN Y AJUSTES (tres puntos) */}
+      <PlanSettingsSheet
+        visible={isSettingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        plan={plan}
+        onUpdate={(patch) => updatePlan(plan.id, (current) => ({ ...current, ...patch }))}
+        onDelete={() => {
+          setSettingsVisible(false);
+          removePlan(plan.id);
+          router.replace('/(tabs)/exams');
+        }}
+        onOpenSources={() => {
+          setSettingsVisible(false);
+          setTab('archivos');
+        }}
+      />
     </View>
   );
 }

@@ -286,6 +286,8 @@ export default function NewExamScreen() {
   const [pasteDraft, setPasteDraft] = useState('');
 
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  /** Mientras se arrastra el dial el scroll se bloquea, o se lleva el gesto. */
+  const [isDialActive, setDialActive] = useState(false);
 
   const accent = useMemo(
     () => getSubjectAccent(subject || 'Foxy', isDark).color,
@@ -482,6 +484,7 @@ export default function NewExamScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        scrollEnabled={!isDialActive}
       >
         {/* PASO 1: MATERIA ---------------------------------------------- */}
         {step === 'subject' ? (
@@ -784,7 +787,12 @@ export default function NewExamScreen() {
             />
 
             <View className="mt-2 items-center">
-              <GradeDial value={targetGrade} onChange={setTargetGrade} color={accent} />
+              <GradeDial
+                value={targetGrade}
+                onChange={setTargetGrade}
+                color={accent}
+                onDragChange={setDialActive}
+              />
             </View>
 
             <View
