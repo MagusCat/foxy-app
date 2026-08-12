@@ -50,7 +50,7 @@ const SLIDES: Slide[] = [
 ];
 
 export default function OnboardingScreen() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const padding = useScreenPadding();
   const router = useRouter();
   const { colors, isDark } = useTheme();
@@ -60,6 +60,13 @@ export default function OnboardingScreen() {
   const [index, setIndex] = useState(0);
 
   const isLast = index === SLIDES.length - 1;
+
+  /**
+   * La ilustración se mide contra el alto además del ancho: en pantallas
+   * bajas, un cuadro de 260 px empujaba el título fuera de la zona visible
+   * (el carrusel es horizontal y no deja bajar).
+   */
+  const artSize = Math.min(width - 96, height * 0.3, 260);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -83,7 +90,7 @@ export default function OnboardingScreen() {
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
       {/* ENCABEZADO: marca a la izquierda, salir a la derecha */}
       <View
-        className="flex-row items-center justify-between px-6"
+        className="flex-row items-center justify-between px-6 pb-2"
         style={{ paddingTop: padding.top }}
       >
         <BrandLogo size={34} withWordmark />
@@ -109,18 +116,18 @@ export default function OnboardingScreen() {
         className="flex-1"
       >
         {SLIDES.map((slide) => (
-          <View key={slide.title} style={{ width }} className="flex-1 items-center justify-center px-8">
+          <View key={slide.title} style={{ width }} className="flex-1 items-center justify-center px-6">
             {/* Hueco de la ilustración. TODO(diseño): sustituir por el arte
                 definitivo cuando esté; las medidas ya son las finales. */}
             <View
-              className="mb-9 items-center justify-center rounded-[36px]"
+              className="mb-8 items-center justify-center rounded-[36px]"
               style={{
-                width: Math.min(width - 96, 260),
-                height: Math.min(width - 96, 260),
+                width: artSize,
+                height: artSize,
                 backgroundColor: softTint(slide.color, isDark),
               }}
             >
-              <Ionicons name={slide.icon} size={84} color={slide.color} />
+              <Ionicons name={slide.icon} size={Math.round(artSize * 0.32)} color={slide.color} />
             </View>
 
             <Text className="text-center text-[24px] font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -134,8 +141,8 @@ export default function OnboardingScreen() {
       </ScrollView>
 
       {/* PIE: puntos y acciones */}
-      <View className="px-8" style={{ paddingBottom: padding.stackBottom }}>
-        <View className="mb-7 flex-row items-center justify-center">
+      <View className="px-6" style={{ paddingBottom: padding.stackBottom }}>
+        <View className="mb-6 flex-row items-center justify-center">
           {SLIDES.map((slide, slideIndex) => {
             const isActive = slideIndex === index;
             return (
@@ -154,27 +161,35 @@ export default function OnboardingScreen() {
         </View>
 
         <TouchableOpacity
-          className="items-center justify-center rounded-full py-4"
+          className="h-14 items-center justify-center rounded-full px-4"
           style={{ backgroundColor: Palette.primary }}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={isLast ? 'Comenzar ahora' : 'Siguiente'}
           onPress={handleNext}
         >
-          <Text className="text-[13px] font-bold uppercase tracking-wider text-white">
+          <Text
+            className="text-[13px] font-bold uppercase tracking-wider text-white"
+            maxFontSizeMultiplier={1.2}
+            numberOfLines={1}
+          >
             {isLast ? 'Comenzar ahora' : 'Siguiente'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          className="mt-3 items-center justify-center rounded-full border py-4"
+          className="mt-3 h-14 items-center justify-center rounded-full border px-4"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Ya tengo cuenta"
           onPress={goToLogin}
         >
-          <Text className="text-[13px] font-bold uppercase tracking-wider text-text-primary-light dark:text-text-primary-dark">
+          <Text
+            className="text-[13px] font-bold uppercase tracking-wider text-text-primary-light dark:text-text-primary-dark"
+            maxFontSizeMultiplier={1.2}
+            numberOfLines={1}
+          >
             Ya tengo cuenta
           </Text>
         </TouchableOpacity>
