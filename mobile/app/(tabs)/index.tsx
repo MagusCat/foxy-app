@@ -270,7 +270,7 @@ export default function HomeScreen() {
               className={`${HEADER_PILL} flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark`}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={`Racha de ${streakCount} días. Ver mi actividad`}
+              accessibilityLabel={`Racha de ${streakCount} ${streakCount === 1 ? 'día' : 'días'}. Ver mi actividad`}
               onPress={() => router.push('/activity')}
             >
               <Ionicons name="flame" size={17} color={Palette.flameOrange} />

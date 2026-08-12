@@ -1125,6 +1125,9 @@ export default function NewExamScreen() {
               style={{ backgroundColor: Palette.primary, opacity: pasteDraft.trim() ? 1 : 0.45 }}
               activeOpacity={0.85}
               disabled={!pasteDraft.trim()}
+              accessibilityRole="button"
+              accessibilityLabel="Añadir texto"
+              accessibilityState={{ disabled: !pasteDraft.trim() }}
               onPress={handleSavePaste}
             >
               <Text className="text-sm font-bold text-white">Añadir texto</Text>
