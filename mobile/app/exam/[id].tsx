@@ -20,8 +20,8 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import {
   dailyLessonGoal,
-  describeCountdown,
   formatExamDate,
+  formatShortDate,
   isTopicUnlocked,
   lessonsDoneToday,
   planProgress,
@@ -488,7 +488,7 @@ export default function ExamPlanScreen() {
 
               <View className="mt-2 h-px" style={{ backgroundColor: colors.cardBorder }} />
 
-              <StatRow emoji="🎓" label="Fecha del examen" value={describeCountdown(plan.examDate)} />
+              <StatRow emoji="🎓" label="Fecha del examen" value={formatShortDate(plan.examDate)} />
               <StatRow emoji="🎯" label="Calificación objetivo" value={`${plan.targetGrade}%`} />
               <StatRow emoji="🔥" label="Racha" value={`${streak.count}`} />
               <StatRow
@@ -541,7 +541,7 @@ export default function ExamPlanScreen() {
                 {streak.count}
               </Text>
               <Text className="text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-                días de racha
+                {streak.count === 1 ? 'día de racha' : 'días de racha'}
               </Text>
               <Text className="mt-1.5 text-center text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
                 {streak.count > 0

@@ -169,10 +169,13 @@ export function nextTopicIndex(plan: StudyPlan) {
   return index === -1 ? plan.topics.length - 1 : index;
 }
 
+/** Tope de la meta diaria: pedir más en un día desanima en vez de empujar. */
+const MAX_DAILY_LESSONS = 12;
+
 /**
  * Cuántas lecciones tocan hoy: lo que falta repartido entre los días que
- * quedan. Con el examen encima se juntan todas en el mismo día, que es
- * justo lo que pasa en la vida real.
+ * quedan, con tope. Con el examen mañana saldrían todas de golpe, y una meta
+ * imposible se abandona antes de empezar.
  */
 export function dailyLessonGoal(plan: StudyPlan) {
   const { lessonsDone, lessonsTotal } = planProgress(plan);
@@ -180,7 +183,7 @@ export function dailyLessonGoal(plan: StudyPlan) {
   if (pending <= 0) return 0;
 
   const daysLeft = Math.max(daysUntil(plan.examDate), 1);
-  return Math.max(1, Math.ceil(pending / daysLeft));
+  return Math.min(MAX_DAILY_LESSONS, Math.max(1, Math.ceil(pending / daysLeft)));
 }
 
 export function lessonsDoneToday(plan: StudyPlan) {
@@ -194,6 +197,12 @@ export function formatExamDate(day: string) {
   const date = new Date(`${day}T00:00:00`);
   const weekdays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   return `${weekdays[date.getDay()]}, ${date.getDate()} de ${MONTH_NAMES[date.getMonth()].toLowerCase()}`;
+}
+
+/** "12 ago": fecha corta para las filas de datos, donde el día largo no cabe. */
+export function formatShortDate(day: string) {
+  const date = new Date(`${day}T00:00:00`);
+  return `${date.getDate()} ${MONTH_NAMES[date.getMonth()].toLowerCase().slice(0, 3)}`;
 }
 
 /** "mañana", "en 3 días", "hoy"… para el pie de las tarjetas. */

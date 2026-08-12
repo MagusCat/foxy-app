@@ -59,7 +59,7 @@ export default function ExamsScreen() {
             style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel={`Racha de ${streakCount} días. Ver mi actividad`}
+            accessibilityLabel={`Racha de ${streakCount} ${streakCount === 1 ? 'día' : 'días'}. Ver mi actividad`}
             onPress={() => router.push('/activity')}
           >
             <Ionicons name="flame" size={17} color={Palette.flameOrange} />
