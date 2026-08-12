@@ -14,11 +14,6 @@ export default function SubscriptionScreen() {
 
   const usedRatio = limit ? Math.min(questionsToday / limit, 1) : 0;
 
-  /**
-   * Sin pasarela de pago todavía. En vez de simular un cobro, el botón deja
-   * avisar a un adulto —que es quien autoriza— y ofrece ver la app con ese
-   * plan para revisar la interfaz.
-   */
   const handleChoosePlan = (plan: Plan) => {
     if (plan.id === planId) return;
 
@@ -51,7 +46,6 @@ export default function SubscriptionScreen() {
 
   return (
     <ScreenShell title="Planes de Fox" subtitle="Elige cómo quieres estudiar con Foxy">
-      {/* TU PLAN ACTUAL */}
       <View
         className="mt-2 rounded-[22px] border p-[18px]"
         style={{
@@ -83,7 +77,6 @@ export default function SubscriptionScreen() {
           {currentPlan.tagline}
         </Text>
 
-        {/* Consumo del día, solo en el plan gratuito */}
         {isBasic && limit ? (
           <View className="mt-3.5">
             <View className="mb-1.5 flex-row items-center justify-between">
@@ -220,7 +213,6 @@ export default function SubscriptionScreen() {
         );
       })}
 
-      {/* PARA MAMÁ, PAPÁ O TUTOR */}
       <SectionTitle>Para mamá, papá o tutor</SectionTitle>
 
       <Card>

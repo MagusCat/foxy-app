@@ -7,22 +7,18 @@ export type PlanId = 'basico' | 'plus' | 'familia';
 export type Plan = {
   id: PlanId;
   name: string;
-  /** Para espacios estrechos, como la píldora de la barra superior. */
   shortName: string;
   tagline: string;
   price: string;
   period: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-  /** Fondo suave de la tarjeta en claro / oscuro. */
   soft: [string, string];
   badge?: string;
   benefits: string[];
-  /** Lo que este plan todavía no incluye. Se muestra en gris, sin dramatismo. */
   missing?: string[];
 };
 
-/** Preguntas diarias a Foxy incluidas en el plan gratuito. */
 export const BASIC_DAILY_QUESTIONS = 10;
 
 export const PLANS: Plan[] = [
