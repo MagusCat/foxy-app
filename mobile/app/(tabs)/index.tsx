@@ -94,6 +94,8 @@ export default function HomeScreen() {
   const goal = useDailyGoal();
 
   const [inputMessage, setInputMessage] = useState('');
+  /** Resumen de lo último que se envió. Se muestra un momento y desaparece. */
+  const [sentNotice, setSentNotice] = useState<string | null>(null);
   const [answerMode, setAnswerMode] = usePersistentState<AnswerMode>('foxy:answer-mode', 'pasos');
   const {
     attachments,
@@ -171,10 +173,6 @@ export default function HomeScreen() {
     const images = attachments.filter((item) => item.kind === 'image').length;
     const files = attachments.length - images;
     const text = inputMessage.trim();
-    const parts = [
-      text ? 'tu pregunta' : null,
-      attachments.length ? `${attachments.length} adjunto${attachments.length > 1 ? 's' : ''}` : null,
-    ].filter(Boolean);
 
     registerQuestion();
     markStudied();
@@ -189,15 +187,25 @@ export default function HomeScreen() {
     setInputMessage('');
     clearAttachments();
 
-    Alert.alert(
-      'Guardado para Foxy',
-      `Ya quedó listo ${parts.join(' y ')} sobre ${selectedSubject}. En cuanto conectemos la IA, Foxy responderá aquí mismo.`,
-      [
-        { text: 'Entendido' },
-        { text: 'Ver mis preguntas', onPress: () => router.push('/history') },
-      ],
-    );
+    // Enviar cuenta como ponerse a estudiar: arranca el temporizador si no
+    // había ninguno en marcha y a partir de ahí se ve arriba, en la barra.
+    if (!focus.isRunning) focus.start();
+
+    // Sin IA todavía no hay respuesta que mostrar, y un Alert por cada envío
+    // corta el ritmo: se avisa en la propia caja y se puede seguir enviando.
+    setSentNotice(text || `${attachments.length} adjunto${attachments.length > 1 ? 's' : ''}`);
   };
+
+  /**
+   * El aviso de "enviado" se borra solo. Se guarda el temporizador para que
+   * dos envíos seguidos no dejen uno viejo apagando el mensaje nuevo.
+   */
+  useEffect(() => {
+    if (!sentNotice) return;
+
+    const timer = setTimeout(() => setSentNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [sentNotice]);
 
   const showComingSoon = (feature: string) => {
     Alert.alert('Próximamente', `${feature} estará disponible muy pronto.`);
@@ -353,47 +361,52 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <View className="mt-7 w-full gap-2">
-            <TouchableOpacity
-              className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel={`Meta de hoy: ${goal.done} de ${goal.goal} minutos. Abrir modo enfoque`}
-              onPress={() => router.push('/focus')}
-            >
-              <View
-                className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
-                style={{ backgroundColor: isDark ? '#331F14' : '#FFEDD5' }}
+            {/* Con el temporizador en marcha esta tarjeta sobra: la cuenta ya
+                se ve arriba, en la barra, y aquí solo repetiría lo mismo en
+                medio de la pantalla. */}
+            {focus.isRunning ? null : (
+              <TouchableOpacity
+                className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Meta de hoy: ${goal.done} de ${goal.goal} minutos. Abrir modo enfoque`}
+                onPress={() => router.push('/focus')}
               >
-                <Ionicons
-                  name={goal.met ? 'checkmark-circle' : 'timer-outline'}
-                  size={18}
-                  color={goal.met ? '#10B981' : Palette.flameOrange}
-                />
-              </View>
-
-              <View className="flex-1">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    {goal.met ? '¡Meta de hoy cumplida!' : 'Meta de hoy'}
-                  </Text>
-                  <Text className="text-[11px] font-bold text-text-secondary-light dark:text-text-secondary-dark">
-                    {goal.done}/{goal.goal} min
-                  </Text>
-                </View>
-
-                <View className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-light dark:bg-surface-dark">
-                  <View
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.round(goal.ratio * 100)}%`,
-                      backgroundColor: goal.met ? '#10B981' : Palette.flameOrange,
-                    }}
+                <View
+                  className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: isDark ? '#331F14' : '#FFEDD5' }}
+                >
+                  <Ionicons
+                    name={goal.met ? 'checkmark-circle' : 'timer-outline'}
+                    size={18}
+                    color={goal.met ? '#10B981' : Palette.flameOrange}
                   />
                 </View>
-              </View>
 
-              <Ionicons name="chevron-forward" size={15} color="#6B7280" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                      {goal.met ? '¡Meta de hoy cumplida!' : 'Meta de hoy'}
+                    </Text>
+                    <Text className="text-[11px] font-bold text-text-secondary-light dark:text-text-secondary-dark">
+                      {goal.done}/{goal.goal} min
+                    </Text>
+                  </View>
+
+                  <View className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-light dark:bg-surface-dark">
+                    <View
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.round(goal.ratio * 100)}%`,
+                        backgroundColor: goal.met ? '#10B981' : Palette.flameOrange,
+                      }}
+                    />
+                  </View>
+                </View>
+
+                <Ionicons name="chevron-forward" size={15} color="#6B7280" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            )}
 
             {nextEvent ? (
               <TouchableOpacity
@@ -520,6 +533,30 @@ export default function HomeScreen() {
                 ))}
               </ScrollView>
             )}
+
+            {/* Confirmación del último envío: se manda sin esperar respuesta,
+                así que este aviso es lo único que devuelve la app por ahora. */}
+            {sentNotice ? (
+              <TouchableOpacity
+                className="mb-2.5 flex-row items-center rounded-xl border border-card-light-border bg-surface-light px-2.5 py-2 dark:border-surface-dark-border dark:bg-surface-dark"
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Enviado. Ver mis preguntas"
+                accessibilityLiveRegion="polite"
+                onPress={() => router.push('/history')}
+              >
+                <Ionicons name="checkmark-circle" size={15} color="#10B981" />
+                <Text
+                  className="ml-1.5 flex-1 text-[11px] text-text-secondary-light dark:text-text-secondary-dark"
+                  numberOfLines={1}
+                >
+                  Enviado: {sentNotice}
+                </Text>
+                <Text className="ml-1.5 text-[11px] font-bold" style={{ color: subjectAccent.color }}>
+                  Ver
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             <TextInput
               className="mb-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"

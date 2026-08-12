@@ -1,123 +1,62 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  Alert,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+
+import { GoalBar } from '@/components/goal-bar';
 import { useScreenPadding } from '@/components/screen-header';
+import { softTint } from '@/components/settings-ui';
+import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
-import { getSubjectAccent } from '@/constants/subject-colors';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
-import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
-import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
-import { useStudyActivity } from '@/hooks/use-study-activity';
-
-const EXAM_SUBJECTS = [
-  'Matemáticas',
-  'Física',
-  'Química',
-  'Biología',
-  'Historia',
-  'Inglés',
-];
-
-type RecentExam = {
-  id: string;
-  subject: string;
-  createdAt: string;
-};
+import { usePersistentState } from '@/hooks/use-persistent-state';
+import { describeCountdown, planProgress, useStudyPlans } from '@/hooks/use-study-plans';
 
 export default function ExamsScreen() {
   const padding = useScreenPadding();
   const router = useRouter();
-  const { isDark } = useTheme();
-  const keyboardHeight = useKeyboardHeight();
-  const iconOnSurface = isDark ? Palette.textPrimaryDark : Palette.textPrimaryLight;
+  const { colors, isDark } = useTheme();
 
-  const [streakCount, , markStudied] = useDailyStreak();
-  const { logSession } = useStudyActivity();
+  const [streakCount] = useDailyStreak();
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
   const [avatarUri] = usePersistentState('foxy:avatar', '');
+  const [school] = usePersistentState('foxy:school', '');
+  const [profile] = usePersistentState('foxy:grade', { grade: '', tutor: '', shift: 'matutino' });
 
-  const [school, setSchool] = usePersistentState('foxy:school', '');
-  const [schoolInput, setSchoolInput] = useState('');
-  const [isSchoolModalVisible, setSchoolModalVisible] = useState(false);
+  const { plans, removePlan } = useStudyPlans();
+  const [query, setQuery] = useState('');
 
-  const [recentExams, setRecentExams] = usePersistentState<RecentExam[]>('foxy:recent-exams', []);
-  const [isCreateExamModalVisible, setCreateExamModalVisible] = useState(false);
-  const [examSubject, setExamSubject] = useState(EXAM_SUBJECTS[0]);
+  const visiblePlans = useMemo(() => {
+    const clean = query.trim().toLowerCase();
+    if (!clean) return plans;
+    return plans.filter(
+      (plan) =>
+        plan.title.toLowerCase().includes(clean) || plan.subject.toLowerCase().includes(clean),
+    );
+  }, [plans, query]);
 
-  const sheetPaddingBottom = useSheetPaddingBottom();
-
-  const handleCreateExam = () => {
-    const newExam: RecentExam = {
-      id: `${Date.now()}`,
-      subject: examSubject,
-      createdAt: new Date().toISOString(),
-    };
-    setRecentExams([newExam, ...recentExams]);
-    setCreateExamModalVisible(false);
-
-    markStudied();
-    logSession({
-      kind: 'exam',
-      subject: examSubject,
-      title: `Examen de ${examSubject}`,
-      minutes: 15,
-    });
-
-    Alert.alert('Examen creado', `Tu examen de ${examSubject} está listo para practicar.`);
-  };
-
-  const handleDeleteExam = (exam: RecentExam) => {
-    Alert.alert('Eliminar examen', `¿Eliminar tu examen de ${exam.subject}?`, [
+  const handleDelete = (id: string, title: string) => {
+    Alert.alert('Eliminar preparación', `¿Eliminar "${title}" y todo su progreso?`, [
       { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: () => setRecentExams(recentExams.filter((item) => item.id !== exam.id)),
-      },
+      { text: 'Eliminar', style: 'destructive', onPress: () => removePlan(id) },
     ]);
-  };
-
-  const handleSaveSchool = () => {
-    const trimmed = schoolInput.trim();
-    if (!trimmed) {
-      Alert.alert('Campo vacío', 'Por favor ingresa el nombre de tu escuela.');
-      return;
-    }
-    setSchool(trimmed);
-    setSchoolInput('');
-    setSchoolModalVisible(false);
-  };
-
-  const showComingSoon = (feature: string) => {
-    Alert.alert('Próximamente', `${feature} estará disponible muy pronto.`);
   };
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
       <ScrollView
         className="px-5"
-        contentContainerStyle={{
-          paddingTop: padding.top,
-          paddingBottom: padding.tabBottom,
-        }}
+        contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.tabBottom }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between pb-4">
+        {/* BARRA SUPERIOR: racha, comprar y avatar */}
+        <View className="flex-row items-center justify-between pb-5">
           <TouchableOpacity
-            className="h-9 flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark"
+            className="h-9 flex-row items-center rounded-full border px-3"
+            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel={`Racha de ${streakCount} días. Ver mi actividad`}
@@ -130,7 +69,31 @@ export default function ExamsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            className="h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark"
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Ver los planes de suscripción"
+            onPress={() => router.push('/subscription')}
+          >
+            <LinearGradient
+              colors={[Palette.primary, Palette.accentBlue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                height: 36,
+                paddingHorizontal: 18,
+                borderRadius: 18,
+              }}
+            >
+              <Text className="text-[14px] font-bold text-white">Comprar</Text>
+              <Ionicons name="sparkles" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="h-9 w-9 items-center justify-center overflow-hidden rounded-full border"
+            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Ir a mi perfil"
@@ -146,131 +109,213 @@ export default function ExamsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View className="items-start rounded-[24px] border border-card-light-border bg-card-light p-5 dark:border-card-dark-border dark:bg-card-dark">
-          <View className="mb-3.5 flex-row">
-            <View className="h-10 w-10 items-center justify-center rounded-full border-2 border-card-light bg-[#FEE2E2] dark:border-card-dark dark:bg-[#2D1B22]">
-              <Ionicons name="flame" size={18} color={Palette.primary} />
-            </View>
-            <View className="-ml-2.5 h-10 w-10 items-center justify-center rounded-full border-2 border-card-light bg-[#DBEAFE] dark:border-card-dark dark:bg-[#152238]">
-              <Ionicons name="school" size={18} color={Palette.accentBlue} />
-            </View>
+        {/* BUSCAR Y CREAR */}
+        <View className="flex-row items-center gap-2.5">
+          <View
+            className="h-11 flex-1 flex-row items-center rounded-full border px-3.5"
+            style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+          >
+            <Ionicons name="search" size={16} color={colors.icon} />
+            <TextInput
+              className="ml-2 flex-1 text-[14px] text-text-primary-light dark:text-text-primary-dark"
+              placeholder="Buscar examen"
+              placeholderTextColor={colors.icon}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+            />
+            {query ? (
+              <TouchableOpacity
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Borrar búsqueda"
+                onPress={() => setQuery('')}
+              >
+                <Ionicons name="close-circle" size={16} color={colors.icon} />
+              </TouchableOpacity>
+            ) : null}
           </View>
 
-          <Text className="mb-1.5 text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
-            Prepárate para tus exámenes con IA
-          </Text>
-          <Text className="mb-[18px] text-[13px] leading-[19px] text-text-secondary-light dark:text-text-secondary-dark">
-            Foxy genera exámenes de práctica a tu medida según lo que necesitas repasar.
-          </Text>
-
           <TouchableOpacity
-            activeOpacity={0.85}
-            className="rounded-[20px]"
-            style={{
-              elevation: 6,
-              shadowColor: Palette.primary,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isDark ? 0.5 : 0.25,
-              shadowRadius: 8,
-            }}
-            onPress={() => setCreateExamModalVisible(true)}
+            className="h-11 flex-row items-center rounded-full border px-4"
+            style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Crear nuevo examen"
+            onPress={() => router.push('/exam/new')}
           >
-            <LinearGradient
-              colors={[Palette.primary, Palette.accentBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 22,
-                paddingVertical: 12,
-                borderRadius: 20,
-              }}
-            >
-              <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text className="text-sm font-bold text-white">Crear mi examen</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() =>
-              Alert.alert(
-                '¿Cómo funciona?',
-                'Elige una materia y Foxy arma un examen de práctica con preguntas adaptadas a tu nivel.',
-              )
-            }
-          >
-            <Text className="mt-3 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-              ¿Cómo funciona? <Ionicons name="information-circle-outline" size={13} />
+            <Ionicons name="add" size={17} color={colors.text} />
+            <Text className="ml-1 text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+              Nuevo examen
             </Text>
           </TouchableOpacity>
         </View>
 
-        {recentExams.length > 0 && (
-          <View className="mt-[26px]">
-            <Text className="mb-3 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
-              Tus exámenes
+        {/* MIS PREPARACIONES DE EXAMEN */}
+        <View className="mt-7">
+          <View className="mb-3 flex-row items-center">
+            <Text className="text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
+              Mis preparaciones de examen
             </Text>
-            {recentExams.map((exam) => {
-              const accent = getSubjectAccent(exam.subject, isDark);
+            <Ionicons name="chevron-forward" size={18} color={colors.text} style={{ marginLeft: 4 }} />
+          </View>
+
+          {plans.length === 0 ? (
+            <View
+              className="items-start rounded-[24px] border p-5"
+              style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+            >
+              <View className="mb-3.5 flex-row">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-full border-2"
+                  style={{ backgroundColor: softTint(Palette.primary, isDark), borderColor: colors.card }}
+                >
+                  <Ionicons name="flame" size={18} color={Palette.primary} />
+                </View>
+                <View
+                  className="-ml-2.5 h-10 w-10 items-center justify-center rounded-full border-2"
+                  style={{ backgroundColor: softTint(Palette.accentBlue, isDark), borderColor: colors.card }}
+                >
+                  <Ionicons name="school" size={18} color={Palette.accentBlue} />
+                </View>
+              </View>
+
+              <Text className="mb-1.5 text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                Prepárate para tu examen con IA
+              </Text>
+              <Text className="mb-[18px] text-[13px] leading-[19px] text-text-secondary-light dark:text-text-secondary-dark">
+                Dinos la materia, cuándo es y qué nota quieres. Foxy arma la ruta de estudio con tu
+                propio material.
+              </Text>
+
+              <TouchableOpacity
+                className="flex-row items-center rounded-[20px] px-[22px] py-3"
+                style={{ backgroundColor: Palette.primary }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Crear nuevo examen"
+                onPress={() => router.push('/exam/new')}
+              >
+                <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text className="text-sm font-bold text-white">Crear nuevo examen</Text>
+              </TouchableOpacity>
+            </View>
+          ) : visiblePlans.length === 0 ? (
+            <Text className="py-4 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
+              Ninguna preparación coincide con “{query.trim()}”.
+            </Text>
+          ) : (
+            visiblePlans.map((plan) => {
+              const progress = planProgress(plan);
+              const accent = getSubjectAccent(plan.subject, isDark);
+
               return (
                 <TouchableOpacity
-                  key={exam.id}
-                  activeOpacity={0.7}
-                  className="mb-2.5 flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
-                  onPress={() => showComingSoon('La práctica de este examen')}
+                  key={plan.id}
+                  className="mb-3 rounded-[22px] border p-4"
+                  style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${plan.title}. ${progress.percent} por ciento de dominio. Examen ${describeCountdown(plan.examDate)}`}
+                  accessibilityHint="Mantén pulsado para eliminar"
+                  onPress={() => router.push({ pathname: '/exam/[id]', params: { id: plan.id } })}
+                  onLongPress={() => handleDelete(plan.id, plan.title)}
                 >
-                  <View className="mr-3 h-2 w-2 rounded-full" style={{ backgroundColor: accent.color }} />
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-                      {exam.subject}
-                    </Text>
-                    <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                      Creado {new Date(exam.createdAt).toLocaleDateString()}
+                  <Text
+                    className="text-[17px] font-bold leading-[23px] text-text-primary-light dark:text-text-primary-dark"
+                    numberOfLines={2}
+                  >
+                    {plan.title}
+                  </Text>
+
+                  <View className="mt-4 flex-row items-end">
+                    <View className="flex-1">
+                      <GoalBar
+                        ratio={progress.ratio}
+                        target={plan.targetGrade}
+                        color={accent.color}
+                        withTargetLabel
+                      />
+                    </View>
+                    <Text className="ml-3 text-[15px] font-bold leading-[16px] text-text-primary-light dark:text-text-primary-dark">
+                      {progress.percent}%
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    className="mr-1 h-8 w-8 items-center justify-center rounded-full"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Eliminar examen de ${exam.subject}`}
-                    onPress={() => handleDeleteExam(exam)}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                  <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+
+                  <View className="mt-4 flex-row items-center justify-between">
+                    <Text className="flex-1 pr-3 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
+                      {describeCountdown(plan.examDate)} · {progress.topicsDone} de{' '}
+                      {progress.topicsTotal} temas
+                    </Text>
+
+                    <TouchableOpacity
+                      className="rounded-full px-5 py-2.5"
+                      style={{ backgroundColor: Palette.primary }}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Continuar con ${plan.title}`}
+                      onPress={() => router.push({ pathname: '/exam/[id]', params: { id: plan.id } })}
+                    >
+                      <Text className="text-[13px] font-bold text-white">Continuar</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
 
-        <View className="mt-[26px]">
-          <Text className="mb-3 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
+        {/* MI ESCUELA */}
+        <View className="mt-7">
+          <Text className="mb-3 text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
             Mi escuela
           </Text>
 
           {school ? (
-            <TouchableOpacity
-              className="flex-row items-center rounded-[18px] border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
-              activeOpacity={0.8}
-              onPress={() => {
-                setSchoolInput(school);
-                setSchoolModalVisible(true);
-              }}
+            <View
+              className="items-center rounded-[24px] border px-5 py-7"
+              style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
             >
-              <View className="mr-2.5 h-8 w-8 items-center justify-center rounded-2xl bg-[#DBEAFE] dark:bg-[#152238]">
-                <Ionicons name="school-outline" size={18} color={Palette.accentBlue} />
+              <TouchableOpacity
+                className="absolute right-3.5 top-3.5 h-9 w-9 items-center justify-center rounded-full"
+                style={{ backgroundColor: colors.surface }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Editar mi escuela"
+                onPress={() => router.push('/settings/school')}
+              >
+                <Ionicons name="pencil" size={15} color={colors.icon} />
+              </TouchableOpacity>
+
+              <View className="flex-row items-center">
+                <Text style={{ fontSize: 26 }}>🌿</Text>
+                <View
+                  className="mx-2 h-14 w-14 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: colors.surface }}
+                >
+                  <Text style={{ fontSize: 26 }}>🏛️</Text>
+                </View>
+                <Text style={{ fontSize: 26, transform: [{ scaleX: -1 }] }}>🌿</Text>
               </View>
-              <Text className="flex-1 text-sm font-semibold text-text-primary-light dark:text-text-primary-dark" numberOfLines={1}>
+
+              <Text
+                className="mt-3.5 text-center text-[21px] font-bold leading-[28px] text-text-primary-light dark:text-text-primary-dark"
+                numberOfLines={3}
+              >
                 {school}
               </Text>
-              <Ionicons name="pencil-outline" size={16} color="#6B7280" />
-            </TouchableOpacity>
+
+              {profile.grade ? (
+                <Text className="mt-1.5 text-center text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
+                  {profile.grade}
+                </Text>
+              ) : null}
+            </View>
           ) : (
-            <View className="rounded-[20px] border border-card-light-border bg-card-light p-[18px] dark:border-card-dark-border dark:bg-card-dark">
+            <View
+              className="rounded-[20px] border p-[18px]"
+              style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+            >
               <Text className="mb-1.5 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
                 ¿A qué escuela vas?
               </Text>
@@ -278,9 +323,12 @@ export default function ExamsScreen() {
                 Personaliza tus exámenes con contenido relacionado a tus profesores y clases.
               </Text>
               <TouchableOpacity
-                className="flex-row items-center self-start rounded-2xl bg-primary px-4 py-[9px]"
+                className="flex-row items-center self-start rounded-2xl px-4 py-[9px]"
+                style={{ backgroundColor: Palette.primary }}
                 activeOpacity={0.8}
-                onPress={() => setSchoolModalVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Agregar escuela"
+                onPress={() => router.push('/settings/school')}
               >
                 <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
                 <Text className="text-[13px] font-semibold text-white">Agregar escuela</Text>
@@ -288,154 +336,7 @@ export default function ExamsScreen() {
             </View>
           )}
         </View>
-
-        <View className="mt-[26px] mb-6">
-          <Text className="mb-3 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
-            Más preparaciones de examen
-          </Text>
-
-          <View className="items-start rounded-[20px] border border-card-light-border bg-card-light p-[18px] dark:border-card-dark-border dark:bg-card-dark">
-            <View className="mb-2.5 h-10 w-10 items-center justify-center rounded-full bg-accent-purple">
-              <Ionicons name="sparkles" size={20} color="#FFFFFF" />
-            </View>
-            <Text className="mb-1 text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
-              Preparado por Foxy AI
-            </Text>
-            <Text className="mb-3.5 text-xs leading-[18px] text-text-secondary-light dark:text-text-secondary-dark">
-              Practica con preguntas generadas por Foxy, tu asistente de estudio con IA.
-            </Text>
-            <TouchableOpacity
-              className="flex-row items-center rounded-2xl border-[1.5px] border-primary px-4 py-2 dark:border-primary-glow"
-              activeOpacity={0.8}
-              onPress={() => showComingSoon('El explorador de preparaciones')}
-            >
-              <Text className="text-[13px] font-bold text-primary dark:text-primary-glow">Explorar</Text>
-              <Ionicons
-                name="arrow-forward"
-                size={14}
-                color={isDark ? Palette.primaryGlow : Palette.primary}
-                style={{ marginLeft: 4 }}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
-
-      <Modal
-        visible={isCreateExamModalVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setCreateExamModalVisible(false)}
-      >
-        <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
-          <TouchableOpacity
-            className="flex-1"
-            activeOpacity={1}
-            onPress={() => setCreateExamModalVisible(false)}
-          />
-          <View
-            className="max-h-[85%] rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
-            style={{ paddingBottom: sheetPaddingBottom }}
-          >
-            <View className="mb-3.5 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-                Crear mi examen
-              </Text>
-              <TouchableOpacity
-                className="h-[30px] w-[30px] items-center justify-center rounded-full bg-[#F3F4F6] dark:bg-[#2A2533]"
-                onPress={() => setCreateExamModalVisible(false)}
-              >
-                <Ionicons name="close" size={18} color={iconOnSurface} />
-              </TouchableOpacity>
-            </View>
-
-            <Text className="mb-3 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
-              Elige la materia para tu examen de práctica:
-            </Text>
-
-            <View className="mb-5 flex-row flex-wrap gap-2">
-              {EXAM_SUBJECTS.map((subject) => {
-                const isSelected = examSubject === subject;
-                const accent = getSubjectAccent(subject, isDark);
-                return (
-                  <TouchableOpacity
-                    key={subject}
-                    className="rounded-2xl border-[1.5px] border-[#E5E7EB] bg-white px-3.5 py-[9px] dark:border-[#2D2838] dark:bg-[#1F1C28]"
-                    style={isSelected ? { borderColor: accent.color, backgroundColor: accent.soft } : undefined}
-                    activeOpacity={0.7}
-                    onPress={() => setExamSubject(subject)}
-                  >
-                    <Text
-                      className="text-[13px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
-                      style={isSelected ? { color: accent.color, fontWeight: '700' } : undefined}
-                    >
-                      {subject}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TouchableOpacity
-              className="items-center rounded-[18px] bg-primary py-3.5"
-              activeOpacity={0.85}
-              onPress={handleCreateExam}
-            >
-              <Text className="text-sm font-bold text-white">Generar examen</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isSchoolModalVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setSchoolModalVisible(false)}
-      >
-        <View
-          className="flex-1 items-center justify-center bg-black/55 px-6 dark:bg-black/80"
-          style={{ paddingBottom: keyboardHeight }}
-        >
-          <View
-            className="w-full rounded-[22px] border border-[#E5E7EB] bg-white p-5 dark:border-[#342F42] dark:bg-[#1C1924]"
-            style={{ elevation: 10 }}
-          >
-            <Text className="mb-3.5 text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-              {school ? 'Editar escuela' : 'Agregar escuela'}
-            </Text>
-            <TextInput
-              className="mb-[18px] rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
-              placeholder="Ej. Colegio San José"
-              placeholderTextColor="#6B7280"
-              value={schoolInput}
-              onChangeText={setSchoolInput}
-              autoFocus
-            />
-            <View className="flex-row justify-end gap-2.5">
-              <TouchableOpacity
-                className="rounded-2xl px-4 py-2"
-                onPress={() => {
-                  setSchoolInput('');
-                  setSchoolModalVisible(false);
-                }}
-              >
-                <Text className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity className="rounded-2xl bg-primary px-5 py-2" onPress={handleSaveSchool}>
-                <Text className="text-sm font-semibold text-white">Guardar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

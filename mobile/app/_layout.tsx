@@ -71,6 +71,9 @@ function RootLayoutContent() {
         <Stack.Screen name="achievements" />
         <Stack.Screen name="focus" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="exam/new" />
+        <Stack.Screen name="exam/[id]" />
+        <Stack.Screen name="exam/topic" />
         <Stack.Screen name="subscription" />
         <Stack.Screen name="settings/account" />
         <Stack.Screen name="settings/school" />

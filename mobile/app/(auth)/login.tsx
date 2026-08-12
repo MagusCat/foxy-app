@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { BrandLogo } from '@/components/brand-logo';
@@ -22,7 +22,7 @@ function ProviderButton({ icon, label, primary, onPress }: ProviderButtonProps) 
 
   return (
     <TouchableOpacity
-      className="mb-3 flex-row items-center justify-center rounded-full border py-4"
+      className="mb-3 h-14 flex-row items-center justify-center rounded-full border px-4"
       style={{
         backgroundColor: primary ? Palette.primary : colors.card,
         borderColor: primary ? Palette.primary : colors.cardBorder,
@@ -33,7 +33,14 @@ function ProviderButton({ icon, label, primary, onPress }: ProviderButtonProps) 
       onPress={onPress}
     >
       <Ionicons name={icon} size={18} color={foreground} style={{ marginRight: 10 }} />
-      <Text className="text-[13px] font-bold uppercase tracking-wider" style={{ color: foreground }}>
+      <Text
+        className="text-[13px] font-bold uppercase tracking-wider"
+        style={{ color: foreground }}
+        // El botón tiene alto fijo: sin tope, una fuente grande del sistema
+        // parte la etiqueta en dos líneas y se sale de la píldora.
+        maxFontSizeMultiplier={1.2}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -74,20 +81,29 @@ export default function LoginScreen() {
   };
 
   return (
-    <View
-      className="flex-1 bg-bg-light px-8 dark:bg-bg-dark"
-      style={{ paddingTop: padding.top, paddingBottom: padding.stackBottom }}
-    >
-      {/* HUECO DEL LOGO: ocupa la mitad superior, como en el diseño. */}
-      <View className="flex-1 items-center justify-center">
-        <BrandLogo size={64} withWordmark />
-      </View>
+    <View className="flex-1 bg-bg-light dark:bg-bg-dark">
+      {/* Con scroll el bloque de botones nunca queda fuera de pantalla en
+          móviles bajos o con la fuente del sistema en grande; `flexGrow`
+          mantiene el logo centrado cuando sí hay sitio de sobra. */}
+      <ScrollView
+        className="px-6"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: padding.top,
+          paddingBottom: padding.stackBottom,
+        }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* HUECO DEL LOGO: se lleva el espacio libre de la mitad superior. */}
+        <View className="flex-1 items-center justify-center py-10" style={{ minHeight: 140 }}>
+          <BrandLogo size={64} withWordmark />
+        </View>
 
-      <View>
         <Text className="text-center text-[26px] font-bold text-text-primary-light dark:text-text-primary-dark">
           Iniciar sesión
         </Text>
-        <Text className="mb-8 mt-2 text-center text-[14px] leading-[20px] text-text-secondary-light dark:text-text-secondary-dark">
+        <Text className="mb-7 mt-2 text-center text-[14px] leading-[20px] text-text-secondary-light dark:text-text-secondary-dark">
           Entra a tu cuenta o crea una nueva. Es gratis.
         </Text>
 
@@ -114,13 +130,13 @@ export default function LoginScreen() {
           onPress={() => handleSignIn('email')}
         />
 
-        <Text className="mt-5 text-center text-[11px] leading-[16px] text-text-secondary-light dark:text-text-secondary-dark">
+        <Text className="mt-4 px-2 text-center text-[11px] leading-[16px] text-text-secondary-light dark:text-text-secondary-dark">
           Al continuar aceptas los <LegalLink label="Términos de uso" /> y la{' '}
           <LegalLink label="Política de privacidad" />.
         </Text>
 
         <View
-          className="mt-6 flex-row items-start rounded-2xl border p-3.5"
+          className="mt-5 flex-row items-start rounded-2xl border p-3.5"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
         >
           <Ionicons
@@ -134,7 +150,7 @@ export default function LoginScreen() {
             tus datos se guardan solo en este dispositivo.
           </Text>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
