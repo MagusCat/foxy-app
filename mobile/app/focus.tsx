@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -35,7 +35,12 @@ export default function FocusScreen() {
 
   const accent = getSubjectAccent(selectedSubject, isDark);
 
-  const finish = useCallback(
+  /**
+   * Guardar a mano lo que llevas al terminar antes de tiempo. Llegar a cero
+   * no pasa por aquí: de eso se encarga `FocusCompletionWatcher` en la raíz,
+   * para que la sesión se cierre igual aunque estés en otra pantalla.
+   */
+  const finishEarly = useCallback(
     (completedMinutes: number) => {
       reset();
 
@@ -50,18 +55,9 @@ export default function FocusScreen() {
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        '¡Sesión completada! 🎉',
-        `${completedMinutes} minutos de ${selectedSubject} sumados a tu actividad de hoy.`,
-      );
     },
     [logSession, markStudied, reset, selectedSubject],
   );
-
-  useEffect(() => {
-    if (!isRunning || secondsLeft > 0) return;
-    finish(minutes);
-  }, [isRunning, secondsLeft, minutes, finish]);
 
   const handleStart = () => {
     start();
@@ -81,14 +77,15 @@ export default function FocusScreen() {
       [
         { text: 'Seguir estudiando', style: 'cancel' },
         { text: 'Descartar', style: 'destructive', onPress: reset },
-        { text: 'Guardar', onPress: () => finish(done) },
+        { text: 'Guardar', onPress: () => finishEarly(done) },
       ],
     );
   };
 
   const changeDuration = (value: string) => setMinutes(Number(value));
 
-  const elapsedRatio = 1 - remaining / (minutes * 60);
+  // Se acota: un total de 0 daría Infinity y un ancho negativo rompe la barra.
+  const elapsedRatio = minutes > 0 ? Math.min(Math.max(1 - remaining / (minutes * 60), 0), 1) : 0;
 
   return (
     <ScreenShell title="Modo enfoque" subtitle="Estudia sin distracciones y suma minutos reales">

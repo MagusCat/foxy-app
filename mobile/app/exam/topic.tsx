@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 
+import { NextLessonSheet } from '@/components/next-lesson-sheet';
 import { ProgressRing } from '@/components/progress-ring';
 import { useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
@@ -67,11 +68,12 @@ export default function TopicScreen() {
   const { colors, isDark } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
 
-  const { plan, completeLesson } = useStudyPlan(planId);
+  const { plan, completeLesson, hydrated } = useStudyPlan(planId);
   const { logSession } = useStudyActivity();
   const [, , markStudied] = useDailyStreak();
 
   const [openLesson, setOpenLesson] = useState<PlanLesson | null>(null);
+  const [isLessonSheetVisible, setLessonSheetVisible] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const topic = plan?.topics.find((item) => item.id === topicId);
@@ -121,6 +123,12 @@ export default function TopicScreen() {
     }
     return lines;
   }, [items]);
+
+  // Igual que en la preparación: no se anuncia que el tema no existe hasta
+  // haber terminado de leer del disco.
+  if (!topic && !hydrated) {
+    return <View className="flex-1 bg-bg-light dark:bg-bg-dark" />;
+  }
 
   if (!plan || !topic) {
     return (
@@ -180,9 +188,9 @@ export default function TopicScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      {/* BARRA SUPERIOR */}
+      {/* BARRA SUPERIOR: volver a la izquierda, el resto junto a la derecha. */}
       <View
-        className="flex-row items-center justify-between px-5 pb-3"
+        className="flex-row items-center px-5 pb-3"
         style={{ paddingTop: padding.top, backgroundColor: colors.background, zIndex: 20 }}
       >
         <TouchableOpacity
@@ -196,35 +204,39 @@ export default function TopicScreen() {
           <Ionicons name="chevron-back" size={18} color={colors.text} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          className="h-9 flex-row items-center rounded-full border px-4"
-          style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Crear otra preparación de examen"
-          onPress={() => router.push('/exam/new')}
-        >
-          <Ionicons name="add" size={16} color={colors.text} />
-          <Text className="ml-1 text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-            Crear
-          </Text>
-        </TouchableOpacity>
+        <View className="flex-1" />
 
-        <TouchableOpacity
-          className="h-9 w-9 items-center justify-center rounded-full border"
-          style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Cómo funciona este tema"
-          onPress={() =>
-            Alert.alert(
-              topic.title,
-              'Cada nodo es una lección. Se abren en orden: al terminar una, se desbloquea la siguiente y sube tu dominio del tema.',
-            )
-          }
-        >
-          <Ionicons name="information-circle-outline" size={18} color={colors.text} />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity
+            className="h-9 flex-row items-center rounded-full border px-4"
+            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Crear una lección de este tema"
+            onPress={() => setLessonSheetVisible(true)}
+          >
+            <Ionicons name="add" size={16} color={colors.text} />
+            <Text className="ml-1 text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+              Crear
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="h-9 w-9 items-center justify-center rounded-full border"
+            style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Cómo funciona este tema"
+            onPress={() =>
+              Alert.alert(
+                topic.title,
+                'Cada burbuja es una lección. Se abren en orden: al terminar una, se desbloquea la siguiente y sube tu dominio del tema.',
+              )
+            }
+          >
+            <Ionicons name="information-circle-outline" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* CABECERA COMPACTA: aparece al bajar */}
@@ -369,7 +381,8 @@ export default function TopicScreen() {
                     left: item.x - NODE / 2,
                     height: NODE,
                     width: NODE,
-                    borderRadius: isDone ? NODE / 2 : 20,
+                    // Todas redondas: el árbol se lee como una ruta de burbujas.
+                    borderRadius: NODE / 2,
                     backgroundColor: isDone ? '#10B981' : colors.card,
                     borderWidth: isCurrent ? 2.5 : 1.5,
                     borderColor: isDone
@@ -486,6 +499,14 @@ export default function TopicScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* HOJA: SIGUIENTE LECCIÓN, ya centrada en este tema */}
+      <NextLessonSheet
+        visible={isLessonSheetVisible}
+        onClose={() => setLessonSheetVisible(false)}
+        plan={plan}
+        topicId={topic.id}
+      />
     </View>
   );
 }

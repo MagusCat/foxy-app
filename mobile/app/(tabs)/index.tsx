@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,9 @@ import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
+import { ChatBubble } from '@/components/chat-bubble';
 import { useScreenPadding } from '@/components/screen-header';
+import { useChat } from '@/hooks/use-chat';
 import { useAgenda, describeEventDate, daysUntil, EVENT_KIND_META } from '@/hooks/use-agenda';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
 import {
@@ -94,9 +96,20 @@ export default function HomeScreen() {
   const goal = useDailyGoal();
 
   const [inputMessage, setInputMessage] = useState('');
-  /** Resumen de lo último que se envió. Se muestra un momento y desaparece. */
-  const [sentNotice, setSentNotice] = useState<string | null>(null);
   const [answerMode, setAnswerMode] = usePersistentState<AnswerMode>('foxy:answer-mode', 'pasos');
+
+  const { messages, send: sendToChat, answer: answerInChat, clear: clearChat } = useChat();
+  const [isFoxyTyping, setFoxyTyping] = useState(false);
+  const threadRef = useRef<ScrollView>(null);
+  const hasChat = messages.length > 0 || isFoxyTyping;
+
+  const scrollToEnd = useCallback(() => {
+    if (!hasChat) return;
+    threadRef.current?.scrollToEnd({ animated: true });
+  }, [hasChat]);
+
+  /** Respuesta pendiente de Foxy, para poder cancelarla al desmontar. */
+  const replyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const {
     attachments,
     addFromCamera,
@@ -173,6 +186,11 @@ export default function HomeScreen() {
     const images = attachments.filter((item) => item.kind === 'image').length;
     const files = attachments.length - images;
     const text = inputMessage.trim();
+    const sentAttachments = attachments.map((item) => ({
+      kind: item.kind,
+      name: item.name,
+      uri: item.uri,
+    }));
 
     registerQuestion();
     markStudied();
@@ -184,6 +202,10 @@ export default function HomeScreen() {
     });
     addQuestion({ text, subject: selectedSubject, mode: answerMode, images, files });
 
+    // El mensaje entra en el hilo, no solo en el historial: la pantalla pasa
+    // a modo conversación en cuanto hay uno.
+    sendToChat(text, selectedSubject, sentAttachments);
+
     setInputMessage('');
     clearAttachments();
 
@@ -191,21 +213,26 @@ export default function HomeScreen() {
     // había ninguno en marcha y a partir de ahí se ve arriba, en la barra.
     if (!focus.isRunning) focus.start();
 
-    // Sin IA todavía no hay respuesta que mostrar, y un Alert por cada envío
-    // corta el ritmo: se avisa en la propia caja y se puede seguir enviando.
-    setSentNotice(text || `${attachments.length} adjunto${attachments.length > 1 ? 's' : ''}`);
+    // Foxy tarda un momento en "escribir". Sin IA la respuesta es fija, pero
+    // contestar en el mismo tick hace que parezca que no ha leído nada.
+    setFoxyTyping(true);
+    replyTimer.current = setTimeout(() => {
+      setFoxyTyping(false);
+      answerInChat(selectedSubject, sentAttachments.length);
+    }, 900);
   };
 
-  /**
-   * El aviso de "enviado" se borra solo. Se guarda el temporizador para que
-   * dos envíos seguidos no dejen uno viejo apagando el mensaje nuevo.
-   */
-  useEffect(() => {
-    if (!sentNotice) return;
+  // Si se sale de la pantalla a media respuesta, el temporizador se cancela.
+  useEffect(() => () => clearTimeout(replyTimer.current), []);
 
-    const timer = setTimeout(() => setSentNotice(null), 4000);
-    return () => clearTimeout(timer);
-  }, [sentNotice]);
+  const handleNewChat = () => {
+    if (messages.length === 0) return;
+
+    Alert.alert('Nueva conversación', '¿Vaciar el hilo? Tus preguntas seguirán en el historial.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Vaciar', style: 'destructive', onPress: clearChat },
+    ]);
+  };
 
   const showComingSoon = (feature: string) => {
     Alert.alert('Próximamente', `${feature} estará disponible muy pronto.`);
@@ -254,16 +281,9 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      <ScrollView
-        className="px-5"
-        contentContainerClassName="flex-grow"
-        contentContainerStyle={{
-          paddingTop: padding.top,
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : padding.tabBottom - 10,
-        }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      {/* BARRA SUPERIOR: fija. En una conversación larga tiene que seguir
+          ahí para volver al perfil o ver la racha sin subir del todo. */}
+      <View className="px-5" style={{ paddingTop: padding.top }}>
         <View className="flex-row items-center justify-between pb-4">
           <View className="mr-2 flex-1 flex-row items-center gap-2">
             <TouchableOpacity
@@ -335,8 +355,46 @@ export default function HomeScreen() {
               </Text>
             )}
           </TouchableOpacity>
-        </View>
 
+          {/* Con conversación abierta se puede empezar otra desde aquí. */}
+          {hasChat ? (
+            <TouchableOpacity
+              className={`${HEADER_PILL} ml-2 aspect-square items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Empezar una conversación nueva"
+              onPress={handleNewChat}
+            >
+              <Ionicons name="create-outline" size={17} color={iconOnSurface} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+
+      <ScrollView
+        ref={threadRef}
+        className="px-5"
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 10 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={scrollToEnd}
+      >
+        {hasChat ? (
+          <View className="pt-1">
+            {messages.map((message) => (
+              <ChatBubble key={message.id} message={message} accent={subjectAccent.color} />
+            ))}
+
+            {isFoxyTyping ? (
+              <View className="mb-3 mr-auto max-w-[86%] flex-row items-center rounded-[18px] rounded-bl-md border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark">
+                <Text style={{ fontSize: 15 }}>🦊</Text>
+                <Text className="ml-2 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
+                  Foxy está escribiendo…
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : (
         <View className="flex-1 items-center justify-center py-8">
           <Text className="text-center text-[22px] font-bold tracking-[-0.3px] text-text-primary-light dark:text-text-primary-dark">
             ¡Hola {userName}! 👋 ¿Qué aprendemos hoy?
@@ -414,7 +472,7 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={`Próximo evento: ${nextEvent.title}, ${describeEventDate(nextEvent.date)}`}
-                onPress={() => router.push('/activity')}
+                onPress={() => router.push('/calendar')}
               >
                 <View
                   className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
@@ -444,8 +502,14 @@ export default function HomeScreen() {
             ) : null}
           </View>
         </View>
+        )}
+      </ScrollView>
 
-        <View className="mt-auto w-full items-center">
+      {/* PANEL DE ENTRADA: anclado abajo, para que no se vaya con el hilo. */}
+      <View
+        className="w-full items-center px-5"
+        style={{ paddingBottom: keyboardHeight > 0 ? sheetPaddingBottom : padding.tabBottom - 22 }}
+      >
           <View className="z-10 -mb-[13px] flex-row items-center gap-2">
             <TouchableOpacity
               className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
@@ -534,30 +598,6 @@ export default function HomeScreen() {
               </ScrollView>
             )}
 
-            {/* Confirmación del último envío: se manda sin esperar respuesta,
-                así que este aviso es lo único que devuelve la app por ahora. */}
-            {sentNotice ? (
-              <TouchableOpacity
-                className="mb-2.5 flex-row items-center rounded-xl border border-card-light-border bg-surface-light px-2.5 py-2 dark:border-surface-dark-border dark:bg-surface-dark"
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Enviado. Ver mis preguntas"
-                accessibilityLiveRegion="polite"
-                onPress={() => router.push('/history')}
-              >
-                <Ionicons name="checkmark-circle" size={15} color="#10B981" />
-                <Text
-                  className="ml-1.5 flex-1 text-[11px] text-text-secondary-light dark:text-text-secondary-dark"
-                  numberOfLines={1}
-                >
-                  Enviado: {sentNotice}
-                </Text>
-                <Text className="ml-1.5 text-[11px] font-bold" style={{ color: subjectAccent.color }}>
-                  Ver
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
             <TextInput
               className="mb-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
               style={{ minHeight: 38, textAlignVertical: 'top' }}
@@ -630,7 +670,6 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
 
       <Modal
         visible={isSubjectModalVisible}

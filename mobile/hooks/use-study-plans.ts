@@ -64,6 +64,8 @@ export type StudyPlan = {
   topics: PlanTopic[];
   /** Respuestas de la encuesta previa. Hoy solo se guardan. */
   survey: string[];
+  /** Evita que otros puedan copiar la preparación. Sin cuentas, solo se guarda. */
+  hidden?: boolean;
 };
 
 /**
