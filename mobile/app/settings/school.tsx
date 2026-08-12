@@ -46,6 +46,7 @@ export default function SchoolScreen() {
   const [newSubject, setNewSubject] = useState('');
 
   const stage = SCHOOL_STAGES.find((item) => item.value === profile.stage);
+  const isGradeChosen = Boolean(profile.stage && profile.level && profile.grade);
   const catalog = useMemo(() => mergeSubjects(subjects), [subjects]);
   const selected = useMemo(
     () => new Set(subjects.map((item) => item.toLowerCase())),
@@ -136,7 +137,7 @@ export default function SchoolScreen() {
             </>
           ) : null}
 
-          {profile.grade ? (
+          {isGradeChosen ? (
             <View
               className="mt-4 flex-row items-center rounded-2xl border px-3.5 py-3"
               style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
@@ -144,6 +145,16 @@ export default function SchoolScreen() {
               <Ionicons name="checkmark-circle" size={17} color="#10B981" />
               <Text className="ml-2.5 text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
                 {profile.grade}
+              </Text>
+            </View>
+          ) : profile.grade ? (
+            <View
+              className="mt-4 flex-row items-start rounded-2xl border px-3.5 py-3"
+              style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+            >
+              <Ionicons name="information-circle-outline" size={16} color={colors.icon} />
+              <Text className="ml-2.5 flex-1 text-[12px] leading-[17px] text-text-secondary-light dark:text-text-secondary-dark">
+                Tenías anotado «{profile.grade}». Elige tu nivel aquí arriba para dejarlo completo.
               </Text>
             </View>
           ) : null}
