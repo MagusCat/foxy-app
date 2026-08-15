@@ -7,6 +7,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { FocusCompletionWatcher } from '@/components/focus-completion-watcher';
 import { NavigationThemes } from '@/constants/theme';
 import { AuthProviderContext, useAuth } from '@/contexts/auth-context';
 import { ThemeProvider, useTheme } from '@/contexts/theme-context';
@@ -60,6 +61,7 @@ function RootLayoutContent() {
   return (
     <NavigationThemeProvider value={NavigationThemes[colorScheme]}>
       <AuthGate />
+      <FocusCompletionWatcher />
 
       {/* Las pantallas apiladas traen su propio encabezado (ScreenShell), así
           que el del navegador se oculta en todas. */}
@@ -68,9 +70,14 @@ function RootLayoutContent() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
         <Stack.Screen name="activity" />
+        <Stack.Screen name="calendar" />
         <Stack.Screen name="achievements" />
         <Stack.Screen name="focus" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="exam/new" />
+        <Stack.Screen name="exam/[id]" />
+        <Stack.Screen name="exam/topic" />
+        <Stack.Screen name="class/[id]" />
         <Stack.Screen name="subscription" />
         <Stack.Screen name="settings/account" />
         <Stack.Screen name="settings/school" />

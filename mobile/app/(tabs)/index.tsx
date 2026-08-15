@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
+import { ChatBubble } from '@/components/chat-bubble';
 import { useScreenPadding } from '@/components/screen-header';
+import { useChat } from '@/hooks/use-chat';
 import { useAgenda, describeEventDate, daysUntil, EVENT_KIND_META } from '@/hooks/use-agenda';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
 import {
@@ -95,6 +98,19 @@ export default function HomeScreen() {
 
   const [inputMessage, setInputMessage] = useState('');
   const [answerMode, setAnswerMode] = usePersistentState<AnswerMode>('foxy:answer-mode', 'pasos');
+
+  const { messages, send: sendToChat, answer: answerInChat, clear: clearChat } = useChat();
+  const [isFoxyTyping, setFoxyTyping] = useState(false);
+  const threadRef = useRef<ScrollView>(null);
+  const hasChat = messages.length > 0 || isFoxyTyping;
+
+  const scrollToEnd = useCallback(() => {
+    if (!hasChat) return;
+    threadRef.current?.scrollToEnd({ animated: true });
+  }, [hasChat]);
+
+
+  const replyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const {
     attachments,
     addFromCamera,
@@ -171,10 +187,11 @@ export default function HomeScreen() {
     const images = attachments.filter((item) => item.kind === 'image').length;
     const files = attachments.length - images;
     const text = inputMessage.trim();
-    const parts = [
-      text ? 'tu pregunta' : null,
-      attachments.length ? `${attachments.length} adjunto${attachments.length > 1 ? 's' : ''}` : null,
-    ].filter(Boolean);
+    const sentAttachments = attachments.map((item) => ({
+      kind: item.kind,
+      name: item.name,
+      uri: item.uri,
+    }));
 
     registerQuestion();
     markStudied();
@@ -186,17 +203,29 @@ export default function HomeScreen() {
     });
     addQuestion({ text, subject: selectedSubject, mode: answerMode, images, files });
 
+    sendToChat(text, selectedSubject, sentAttachments);
+
     setInputMessage('');
     clearAttachments();
 
-    Alert.alert(
-      'Guardado para Foxy',
-      `Ya quedó listo ${parts.join(' y ')} sobre ${selectedSubject}. En cuanto conectemos la IA, Foxy responderá aquí mismo.`,
-      [
-        { text: 'Entendido' },
-        { text: 'Ver mis preguntas', onPress: () => router.push('/history') },
-      ],
-    );
+    if (!focus.isRunning) focus.start();
+
+    setFoxyTyping(true);
+    replyTimer.current = setTimeout(() => {
+      setFoxyTyping(false);
+      answerInChat(selectedSubject, sentAttachments.length);
+    }, 900);
+  };
+
+  useEffect(() => () => clearTimeout(replyTimer.current), []);
+
+  const handleNewChat = () => {
+    if (messages.length === 0) return;
+
+    Alert.alert('Nueva conversación', '¿Vaciar el hilo? Tus preguntas seguirán en el historial.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Vaciar', style: 'destructive', onPress: clearChat },
+    ]);
   };
 
   const showComingSoon = (feature: string) => {
@@ -246,23 +275,14 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
-      <ScrollView
-        className="px-5"
-        contentContainerClassName="flex-grow"
-        contentContainerStyle={{
-          paddingTop: padding.top,
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : padding.tabBottom - 10,
-        }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View className="px-5" style={{ paddingTop: padding.top }}>
         <View className="flex-row items-center justify-between pb-4">
           <View className="mr-2 flex-1 flex-row items-center gap-2">
             <TouchableOpacity
               className={`${HEADER_PILL} flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark`}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={`Racha de ${streakCount} días. Ver mi actividad`}
+              accessibilityLabel={`Racha de ${streakCount} ${streakCount === 1 ? 'día' : 'días'}. Ver mi actividad`}
               onPress={() => router.push('/activity')}
             >
               <Ionicons name="flame" size={17} color={Palette.flameOrange} />
@@ -327,8 +347,45 @@ export default function HomeScreen() {
               </Text>
             )}
           </TouchableOpacity>
-        </View>
 
+          {hasChat ? (
+            <TouchableOpacity
+              className={`${HEADER_PILL} ml-2 aspect-square items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Empezar una conversación nueva"
+              onPress={handleNewChat}
+            >
+              <Ionicons name="create-outline" size={17} color={iconOnSurface} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+
+      <ScrollView
+        ref={threadRef}
+        className="px-5"
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 10 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={scrollToEnd}
+      >
+        {hasChat ? (
+          <View className="pt-1">
+            {messages.map((message) => (
+              <ChatBubble key={message.id} message={message} accent={subjectAccent.color} />
+            ))}
+
+            {isFoxyTyping ? (
+              <View className="mb-3 mr-auto max-w-[86%] flex-row items-center rounded-[18px] rounded-bl-md border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark">
+                <Text style={{ fontSize: 15 }}>🦊</Text>
+                <Text className="ml-2 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
+                  Foxy está escribiendo…
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : (
         <View className="flex-1 items-center justify-center py-8">
           <Text className="text-center text-[22px] font-bold tracking-[-0.3px] text-text-primary-light dark:text-text-primary-dark">
             ¡Hola {userName}! ¿Qué quiere estudiar hoy?
@@ -362,47 +419,49 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <View className="mt-7 w-full gap-2">
-            <TouchableOpacity
-              className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel={`Meta de hoy: ${goal.done} de ${goal.goal} minutos. Abrir modo enfoque`}
-              onPress={() => router.push('/focus')}
-            >
-              <View
-                className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
-                style={{ backgroundColor: isDark ? '#331F14' : '#FFEDD5' }}
+            {focus.isRunning ? null : (
+              <TouchableOpacity
+                className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Meta de hoy: ${goal.done} de ${goal.goal} minutos. Abrir modo enfoque`}
+                onPress={() => router.push('/focus')}
               >
-                <Ionicons
-                  name={goal.met ? 'checkmark-circle' : 'timer-outline'}
-                  size={18}
-                  color={goal.met ? '#10B981' : Palette.flameOrange}
-                />
-              </View>
-
-              <View className="flex-1">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    {goal.met ? '¡Meta de hoy cumplida!' : 'Meta de hoy'}
-                  </Text>
-                  <Text className="text-[11px] font-bold text-text-secondary-light dark:text-text-secondary-dark">
-                    {goal.done}/{goal.goal} min
-                  </Text>
-                </View>
-
-                <View className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-light dark:bg-surface-dark">
-                  <View
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.round(goal.ratio * 100)}%`,
-                      backgroundColor: goal.met ? '#10B981' : Palette.flameOrange,
-                    }}
+                <View
+                  className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: isDark ? '#331F14' : '#FFEDD5' }}
+                >
+                  <Ionicons
+                    name={goal.met ? 'checkmark-circle' : 'timer-outline'}
+                    size={18}
+                    color={goal.met ? '#10B981' : Palette.flameOrange}
                   />
                 </View>
-              </View>
 
-              <Ionicons name="chevron-forward" size={15} color="#6B7280" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                      {goal.met ? '¡Meta de hoy cumplida!' : 'Meta de hoy'}
+                    </Text>
+                    <Text className="text-[11px] font-bold text-text-secondary-light dark:text-text-secondary-dark">
+                      {goal.done}/{goal.goal} min
+                    </Text>
+                  </View>
+
+                  <View className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-light dark:bg-surface-dark">
+                    <View
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.round(goal.ratio * 100)}%`,
+                        backgroundColor: goal.met ? '#10B981' : Palette.flameOrange,
+                      }}
+                    />
+                  </View>
+                </View>
+
+                <Ionicons name="chevron-forward" size={15} color="#6B7280" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            )}
 
             {nextEvent ? (
               <TouchableOpacity
@@ -410,7 +469,7 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel={`Próximo evento: ${nextEvent.title}, ${describeEventDate(nextEvent.date)}`}
-                onPress={() => router.push('/activity')}
+                onPress={() => router.push('/calendar')}
               >
                 <View
                   className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
@@ -440,8 +499,13 @@ export default function HomeScreen() {
             ) : null}
           </View>
         </View>
+        )}
+      </ScrollView>
 
-        <View className="mt-auto w-full items-center">
+      <View
+        className="w-full items-center px-5"
+        style={{ paddingBottom: keyboardHeight > 0 ? sheetPaddingBottom : padding.tabBottom - 22 }}
+      >
           <View className="z-10 -mb-[13px] flex-row items-center gap-2">
             <TouchableOpacity
               className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
@@ -602,7 +666,6 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
 
       <Modal
         visible={isSubjectModalVisible}

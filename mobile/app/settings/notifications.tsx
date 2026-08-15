@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { Alert } from 'react-native';
 
 import {
   Card,
   CardDivider,
   Note,
-  PromptModal,
   Row,
   ScreenShell,
   SectionTitle,
   SwitchRow,
 } from '@/components/settings-ui';
+import { TimePickerSheet } from '@/components/time-picker-sheet';
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { formatTime12 } from '@/lib/time';
 
 type NotificationPrefs = {
   enabled: boolean;
@@ -39,8 +39,6 @@ const DEFAULT_PREFS: NotificationPrefs = {
   quietTo: '07:00',
 };
 
-const TIME_PATTERN = /^([01]?\d|2[0-3]):[0-5]\d$/;
-
 type TimeField = 'reminderTime' | 'quietFrom' | 'quietTo' | null;
 
 const TIME_LABELS: Record<Exclude<TimeField, null>, string> = {
@@ -57,10 +55,6 @@ export default function NotificationsScreen() {
     setPrefs((prev) => ({ ...prev, [key]: value }));
 
   const handleSaveTime = (value: string) => {
-    if (!TIME_PATTERN.test(value)) {
-      Alert.alert('Hora no válida', 'Usa el formato de 24 horas, por ejemplo 08:30 o 19:45.');
-      return;
-    }
     if (editing) update(editing, value);
     setEditing(null);
   };
@@ -94,7 +88,7 @@ export default function NotificationsScreen() {
         <Row
           icon="time-outline"
           label="Hora del recordatorio"
-          value={prefs.reminderTime}
+          value={formatTime12(prefs.reminderTime)}
           onPress={off || !prefs.dailyReminder ? undefined : () => setEditing('reminderTime')}
         />
         <CardDivider />
@@ -152,14 +146,14 @@ export default function NotificationsScreen() {
         <Row
           icon="bed-outline"
           label="Desde"
-          value={prefs.quietFrom}
+          value={formatTime12(prefs.quietFrom)}
           onPress={off || !prefs.quietHours ? undefined : () => setEditing('quietFrom')}
         />
         <CardDivider />
         <Row
           icon="sunny-outline"
           label="Hasta"
-          value={prefs.quietTo}
+          value={formatTime12(prefs.quietTo)}
           onPress={off || !prefs.quietHours ? undefined : () => setEditing('quietTo')}
         />
       </Card>
@@ -169,13 +163,11 @@ export default function NotificationsScreen() {
         tus preferencias quedan guardadas en este dispositivo.
       </Note>
 
-      <PromptModal
+      <TimePickerSheet
         visible={editing !== null}
         title={editing ? TIME_LABELS[editing] : ''}
-        description="Escríbela en formato de 24 horas, por ejemplo 18:30."
-        placeholder="18:00"
-        initialValue={editing ? prefs[editing] : ''}
-        maxLength={5}
+        description="Desliza para elegir la hora"
+        value={editing ? prefs[editing] : '18:00'}
         onCancel={() => setEditing(null)}
         onSave={handleSaveTime}
       />
