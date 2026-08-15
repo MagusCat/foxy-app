@@ -331,11 +331,7 @@ export default function HomeScreen() {
 
         <View className="flex-1 items-center justify-center py-8">
           <Text className="text-center text-[22px] font-bold tracking-[-0.3px] text-text-primary-light dark:text-text-primary-dark">
-            ¡Hola {userName}! 👋 ¿Qué aprendemos hoy?
-          </Text>
-          <Text className="mt-2 px-4 text-center text-[13px] leading-[19px] text-text-secondary-light dark:text-text-secondary-dark">
-            Soy Foxy, tu inteligencia artificial para estudiar: te explico paso a paso, te tomo la
-            lección y preparo tus exámenes contigo.
+            ¡Hola {userName}! ¿Qué quiere estudiar hoy?
           </Text>
 
           <TouchableOpacity
@@ -346,10 +342,23 @@ export default function HomeScreen() {
             className="mt-5 flex-row items-center rounded-[22px] px-[22px] py-3"
             style={{ backgroundColor: Palette.primary }}
           >
-            <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text className="text-sm font-bold text-white" numberOfLines={1}>
-              Comenzar
-            </Text>
+            <LinearGradient
+              colors={[Palette.primary, Palette.accentBlue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 22,
+                paddingVertical: 12,
+                borderRadius: 22,
+              }}
+            >
+              <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text className="text-sm font-bold text-white" numberOfLines={1}>
+                Comienza aquí
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <View className="mt-7 w-full gap-2">
