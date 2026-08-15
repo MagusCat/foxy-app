@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/** `null` significa "la clave se borró": cada instancia vuelve a su inicial. */
 type Listener = (serialized: string | null, from: symbol) => void;
 
-/**
- * Las pestañas siguen montadas al cambiar de tab, así que dos pantallas que
- * usan la misma clave necesitan enterarse de los cambios de la otra. Sin esto,
- * cambiar el nombre en Perfil no se vería en Preguntar hasta reiniciar la app.
- */
 const listeners = new Map<string, Set<Listener>>();
 
 function broadcast(key: string, serialized: string | null, from: symbol) {
@@ -19,13 +13,8 @@ export function usePersistentState<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(initialValue);
   const [hydrated, setHydrated] = useState(false);
 
-  // Identifica a esta instancia para ignorar sus propios avisos.
   const instanceId = useRef<symbol>(Symbol(key));
-  // Último valor ya escrito/recibido: corta los bucles de eco entre instancias.
   const lastSerialized = useRef<string | null>(null);
-  // El inicial se lee en el listener de borrado, donde el closure sería viejo.
-  // Se actualiza en un efecto y no durante el render: mutar una ref mientras
-  // se renderiza rompe al compilador de React, que está activado.
   const initialRef = useRef(initialValue);
   useEffect(() => {
     initialRef.current = initialValue;
@@ -40,9 +29,7 @@ export function usePersistentState<T>(key: string, initialValue: T) {
         try {
           setValue(JSON.parse(raw) as T);
           lastSerialized.current = raw;
-        } catch {
-          // Valor corrupto: nos quedamos con el inicial y lo sobrescribimos.
-        }
+        } catch {}
       })
       .catch(() => {})
       .finally(() => {
@@ -54,13 +41,11 @@ export function usePersistentState<T>(key: string, initialValue: T) {
     };
   }, [key]);
 
-  // Escucha cambios hechos por otras pantallas sobre la misma clave.
   useEffect(() => {
     const self = instanceId.current;
     const listener: Listener = (serialized, from) => {
       if (from === self) return;
 
-      // Clave borrada (cerrar sesión / borrar datos): volvemos al inicial.
       if (serialized === null) {
         lastSerialized.current = null;
         setValue(initialRef.current);
@@ -84,8 +69,6 @@ export function usePersistentState<T>(key: string, initialValue: T) {
     };
   }, [key]);
 
-  // Persiste y avisa al resto. Hasta hidratar no escribimos, o el valor
-  // inicial pisaría lo que el usuario había guardado antes.
   useEffect(() => {
     if (!hydrated) return;
 
@@ -100,11 +83,6 @@ export function usePersistentState<T>(key: string, initialValue: T) {
   return [value, setValue, hydrated] as const;
 }
 
-/**
- * Borra claves guardadas y avisa a las pantallas montadas para que vuelvan a
- * su valor inicial. Sin el aviso había que reiniciar la app para ver el
- * resultado de "Borrar mis datos" o "Cerrar sesión".
- */
 export async function clearPersistedState(keys: string[]) {
   await AsyncStorage.multiRemove(keys);
 
@@ -119,7 +97,6 @@ export const STORAGE_KEYS = [
   'foxy:account',
   'foxy:subjects',
   'foxy:selected-subject',
-  'foxy:mood',
   'foxy:school',
   'foxy:grade',
   'foxy:recent-exams',
@@ -134,9 +111,9 @@ export const STORAGE_KEYS = [
   'foxy:usage',
   'foxy:notifications',
   'foxy:learning',
+  'foxy:focus-session',
 ];
 
-/** Lo que se limpia al cerrar sesión: la cuenta, no las preferencias del equipo. */
 export const SESSION_KEYS = [
   'foxy:user-name',
   'foxy:avatar',
@@ -149,4 +126,5 @@ export const SESSION_KEYS = [
   'foxy:events',
   'foxy:questions',
   'foxy:usage',
+  'foxy:focus-session',
 ];

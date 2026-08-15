@@ -5,13 +5,8 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 
 const STORAGE_KEY = 'foxy:questions';
 
-/** Preguntas que se conservan. Las guardadas nunca se descartan. */
 const MAX_HISTORY = 60;
 
-/**
- * Cómo quiere el usuario que Foxy responda. Es lo que ofrecen las apps de
- * este tipo: la respuesta directa, el procedimiento, o que te pregunte a ti.
- */
 export type AnswerMode = 'respuesta' | 'pasos' | 'quiz';
 
 export const ANSWER_MODES: {
@@ -32,21 +27,12 @@ export type AskedQuestion = {
   mode: AnswerMode;
   images: number;
   files: number;
-  /** ISO. */
   at: string;
-  /** Marcada por el usuario para no perderla. */
   saved: boolean;
 };
 
 export type PendingQuestion = { text: string; subject: string } | null;
 
-/**
- * Pregunta que el historial deja lista para reenviar.
- *
- * Se usa estado compartido en vez de parámetros de navegación: al navegar a
- * la pestaña con parámetros, el navegador apilaba una segunda pantalla de
- * Preguntar y el botón atrás llevaba a un inicio duplicado.
- */
 export function usePendingQuestion() {
   return usePersistentState<PendingQuestion>('foxy:pending-question', null);
 }
@@ -65,7 +51,6 @@ export function useQuestionHistory() {
 
       setQuestions((prev) => {
         const next = [entry, ...prev];
-        // El recorte respeta las guardadas: se descartan solo las sueltas.
         if (next.length <= MAX_HISTORY) return next;
 
         const kept: AskedQuestion[] = [];
@@ -101,7 +86,6 @@ export function useQuestionHistory() {
     [setQuestions],
   );
 
-  /** Borra el historial pero conserva lo que el usuario marcó como guardado. */
   const clearUnsaved = useCallback(
     () => setQuestions((prev) => prev.filter((item) => item.saved)),
     [setQuestions],

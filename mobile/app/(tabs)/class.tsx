@@ -26,7 +26,7 @@ export type Classroom = {
   code: string;
 };
 
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin I/O/0/1 para evitar confusiones
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateRoomCode() {
   let code = '';
@@ -174,7 +174,6 @@ export default function ClassScreen() {
         />
 
         {rooms.length === 0 ? (
-          /* ESTADO VACÍO */
           <View className="items-center rounded-[24px] border border-card-light-border bg-card-light px-6 py-10 dark:border-card-dark-border dark:bg-card-dark">
             <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-[#FEE2E2] dark:bg-[#2D1B22]">
               <Text className="text-3xl">🦊</Text>
@@ -196,7 +195,6 @@ export default function ClassScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          /* LISTA DE SALONES */
           <View className="mt-2">
             {rooms.map((room) => {
               const accent = getSubjectAccent(room.subject || room.name, isDark);
@@ -207,7 +205,6 @@ export default function ClassScreen() {
                   key={room.id}
                   className="mb-3 overflow-hidden rounded-[20px] border border-card-light-border bg-card-light dark:border-card-dark-border dark:bg-card-dark"
                 >
-                  {/* Franja de color por materia */}
                   <View style={{ height: 4, backgroundColor: accent.color }} />
 
                   <View className="p-4">
@@ -263,7 +260,6 @@ export default function ClassScreen() {
                         <View />
                       )}
 
-                      {/* Código pensado para unirse al salón cuando exista backend */}
                       <TouchableOpacity
                         className="flex-row items-center rounded-full px-2.5 py-1"
                         style={{ backgroundColor: accent.soft }}
@@ -294,7 +290,6 @@ export default function ClassScreen() {
         )}
       </ScrollView>
 
-      {/* MODAL: CREAR / EDITAR SALÓN */}
       <Modal
         visible={isFormVisible}
         transparent

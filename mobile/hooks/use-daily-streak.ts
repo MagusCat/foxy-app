@@ -4,13 +4,10 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 
 const STORAGE_KEY = 'foxy:streak';
 
-/** Días que se conservan en el historial (suficiente para un año de rachas). */
 const MAX_HISTORY = 400;
 
-/** Meta por defecto: 5 días activos por semana. */
 export const WEEKLY_GOAL = 5;
 
-/** Congelaciones acumulables y cada cuántos días seguidos se gana una. */
 export const MAX_FREEZES = 2;
 const FREEZE_EVERY = 7;
 
@@ -19,26 +16,19 @@ const MILESTONES = [3, 7, 14, 30, 60, 100, 180, 365];
 const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 type StoredStreak = {
-  /** Días con actividad, en formato YYYY-MM-DD local y orden ascendente. */
   days: string[];
-  /** Mejor racha alcanzada, para no perderla al romperse la actual. */
   best: number;
-  /** Congelaciones disponibles. */
   freezes: number;
-  /** Días que se salvaron gastando una congelación. */
   frozen: string[];
-  /** Día en que se otorgó la última congelación, para no repetir el premio. */
   lastGrantDay?: string;
 };
 
-/** Formato viejo del hook: se migra al hidratar. */
 type LegacyStreak = { lastDay?: string; count?: number };
 
 export type StreakDay = {
   key: string;
   label: string;
   active: boolean;
-  /** El día se salvó con una congelación, no con estudio real. */
   frozen: boolean;
   isToday: boolean;
   isFuture: boolean;
@@ -47,23 +37,17 @@ export type StreakDay = {
 export type StreakInfo = {
   count: number;
   best: number;
-  /** Total de días activos registrados, no necesariamente seguidos. */
   totalDays: number;
-  /** Semana actual de lunes a domingo. */
   week: StreakDay[];
   weeklyActive: number;
   weeklyGoal: number;
-  /** La racha sigue viva por ayer, pero hoy todavía no hay actividad. */
   atRisk: boolean;
-  /** Congelaciones guardadas para cubrir un día perdido. */
   freezes: number;
-  /** Siguiente meta de días seguidos, o `null` si ya pasó todas. */
   nextMilestone: number | null;
   daysToMilestone: number;
   hydrated: boolean;
 };
 
-/** Fecha local en YYYY-MM-DD (no usamos toISOString: eso convierte a UTC). */
 function localDay(date: Date) {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
@@ -80,14 +64,12 @@ function shiftDays(date: Date, amount: number) {
   return copy;
 }
 
-/** Lunes de la semana a la que pertenece la fecha. */
 function startOfWeek(date: Date) {
   const copy = new Date(date);
   copy.setHours(0, 0, 0, 0);
   return shiftDays(copy, -((copy.getDay() + 6) % 7));
 }
 
-/** Acepta el formato actual y el viejo `{ lastDay, count }`. */
 function normalize(value: StoredStreak | LegacyStreak | null | undefined): StoredStreak {
   const base = { freezes: 1, frozen: [] as string[] };
 
@@ -110,12 +92,10 @@ function normalize(value: StoredStreak | LegacyStreak | null | undefined): Store
   return { ...base, days: [], best: 0 };
 }
 
-/** Días que cuentan para la racha: los estudiados más los congelados. */
 function activeDays(stored: StoredStreak) {
   return new Set([...stored.days, ...stored.frozen]);
 }
 
-/** Añade un día al historial. Devuelve el mismo objeto si ya estaba. */
 function withDay(stored: StoredStreak, day: string): StoredStreak {
   if (stored.days.includes(day)) return stored;
   const days = [...stored.days, day].sort().slice(-MAX_HISTORY);
@@ -125,7 +105,6 @@ function withDay(stored: StoredStreak, day: string): StoredStreak {
 function streakEndingAt(daySet: Set<string>, today: string) {
   let cursor = parseDay(today);
 
-  // Si hoy aún no hay actividad, la racha puede seguir viva por ayer.
   if (!daySet.has(today)) {
     cursor = shiftDays(cursor, -1);
     if (!daySet.has(localDay(cursor))) return 0;
@@ -139,13 +118,6 @@ function streakEndingAt(daySet: Set<string>, today: string) {
   return count;
 }
 
-/**
- * Registra el día de hoy aplicando las reglas de la racha.
- *
- * Antes de sumar el día se revisa si ayer quedó vacío: si la racha venía viva
- * y hay una congelación guardada, se gasta para tapar ese hueco. Después, cada
- * siete días seguidos se gana una congelación nueva (máximo dos).
- */
 function advance(stored: StoredStreak, today: string): StoredStreak {
   let next = stored;
   const active = activeDays(stored);
@@ -172,15 +144,6 @@ function advance(stored: StoredStreak, today: string): StoredStreak {
   return next;
 }
 
-/**
- * Racha de días seguidos usando Foxy.
- *
- * Abrir la app cuenta el día; `markStudied` deja marcarlo también desde una
- * acción concreta (enviar una pregunta, generar un examen) y es idempotente.
- * Se guarda el historial completo, así que se pueden mostrar la semana, la
- * mejor racha y el progreso semanal, y un cambio de reloj hacia atrás ya no
- * borra el progreso.
- */
 export function useDailyStreak() {
   const [raw, setRaw, hydrated] = usePersistentState<StoredStreak>(STORAGE_KEY, {
     days: [],
@@ -189,8 +152,6 @@ export function useDailyStreak() {
     frozen: [],
   });
 
-  // Migra el formato viejo y registra el día de hoy, una vez ya hidratado. Si
-  // nada cambia, `advance` devuelve el mismo contenido y no se reescribe.
   useEffect(() => {
     if (!hydrated) return;
     setRaw((prev) => advance(normalize(prev), localDay(new Date())));
@@ -243,7 +204,6 @@ export function useDailyStreak() {
     };
   }, [raw, hydrated]);
 
-  // La mejor racha se persiste aparte para que sobreviva a un corte de racha.
   useEffect(() => {
     if (!hydrated) return;
     setRaw((prev) => {

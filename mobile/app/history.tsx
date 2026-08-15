@@ -15,7 +15,6 @@ import {
 
 type Filter = 'todas' | 'guardadas';
 
-/** "Hace 5 min" / "Ayer" / "12 de marzo" */
 function describeMoment(iso: string) {
   const date = new Date(iso);
   const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
@@ -50,9 +49,6 @@ export default function HistoryScreen() {
   const list = filter === 'guardadas' ? saved : questions;
 
   const handleAskAgain = (question: AskedQuestion) => {
-    // La pregunta viaja por estado compartido y se vuelve cerrando la pila, no
-    // navegando con parámetros: eso apilaba una segunda pantalla de Preguntar
-    // y el botón atrás llevaba a un inicio duplicado.
     setPending({ text: question.text, subject: question.subject });
 
     if (router.canDismiss()) {
@@ -82,7 +78,6 @@ export default function HistoryScreen() {
 
   return (
     <ScreenShell title="Mis preguntas" subtitle="Todo lo que le has preguntado a Foxy">
-      {/* FILTROS */}
       <View className="mt-2 flex-row rounded-full p-1" style={{ backgroundColor: colors.surface }}>
         {([
           { value: 'todas' as const, label: `Todas (${questions.length})` },
@@ -137,8 +132,6 @@ export default function HistoryScreen() {
 
             return (
               <Card key={question.id}>
-                {/* El texto es el pulsable y la fila de acciones va aparte:
-                    anidar botones deja ambiguo cuál responde al toque. */}
                 <View className="p-3.5">
                   <TouchableOpacity
                     activeOpacity={0.7}

@@ -89,9 +89,6 @@ export default function ProfileScreen() {
       >
         <TabHeader title="Mi perfil" />
 
-        {/* IDENTIDAD: la foto abre su selector y el resto lleva a Mi cuenta.
-            Son dos zonas táctiles hermanas, no anidadas: un pulsable dentro de
-            otro deja ambiguo qué responde al toque. */}
         <View
           className="flex-row items-center rounded-2xl border p-4"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
@@ -124,7 +121,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* PLAN: única tarjeta a color de la pantalla, para que destaque. */}
         <TouchableOpacity
           className="mt-3 rounded-2xl border p-4"
           style={{ backgroundColor: softTint(plan.color, isDark), borderColor: plan.color }}
@@ -185,7 +181,6 @@ export default function ProfileScreen() {
           ) : null}
         </TouchableOpacity>
 
-        {/* RACHA */}
         <TouchableOpacity
           className="mt-3 rounded-2xl border p-4"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
@@ -227,7 +222,6 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* RESUMEN */}
         <View className="mt-3 flex-row gap-3">
           {[
             { value: formatMinutes(stats.weekMinutes), label: 'esta semana' },
@@ -253,7 +247,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* MI PROGRESO */}
         <SectionTitle>Mi progreso</SectionTitle>
         <Card>
           <Row icon="stats-chart-outline" label="Mi actividad" onPress={() => router.push('/activity')} />
@@ -282,7 +275,6 @@ export default function ProfileScreen() {
           <Row icon="timer-outline" label="Modo enfoque" onPress={() => router.push('/focus')} />
         </Card>
 
-        {/* CUENTA */}
         <SectionTitle>Cuenta</SectionTitle>
         <Card>
           <Row icon="person-outline" label="Mi cuenta" onPress={() => router.push('/settings/account')} />
@@ -302,7 +294,6 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        {/* CONFIGURACIÓN */}
         <SectionTitle>Configuración</SectionTitle>
         <Card>
           <Row
@@ -317,8 +308,6 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings/notifications')}
           />
           <CardDivider />
-          {/* El tema se cambia aquí mismo: es de lo que más se toca y no
-              merece una pantalla propia. */}
           <Row
             icon="contrast-outline"
             label="Apariencia"
@@ -352,7 +341,6 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        {/* PRIVACIDAD */}
         <SectionTitle>Privacidad</SectionTitle>
         <Card>
           <Row
@@ -362,7 +350,6 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        {/* AYUDA */}
         <SectionTitle>Ayuda</SectionTitle>
         <Card>
           <Row
@@ -378,7 +365,6 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        {/* CERRAR SESIÓN */}
         <TouchableOpacity
           className="mt-6 flex-row items-center justify-center rounded-2xl border py-3.5"
           style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}

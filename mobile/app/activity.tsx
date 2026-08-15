@@ -33,7 +33,6 @@ const KIND_OPTIONS: { value: EventKind; label: string }[] = [
   { value: 'repaso', label: 'Repaso' },
 ];
 
-/** "Hace 5 min" / "Ayer" / "12 de marzo" */
 function describeMoment(iso: string) {
   const date = new Date(iso);
   const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
@@ -103,7 +102,6 @@ export default function ActivityScreen() {
     }
 
     const time = eventTime.trim();
-    // Validamos aquí porque el campo es libre: no hay selector de hora nativo.
     if (time && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) {
       Alert.alert('Hora no válida', 'Usa el formato de 24 horas, por ejemplo 08:30 o 17:45.');
       return;
@@ -123,7 +121,6 @@ export default function ActivityScreen() {
   return (
     <>
       <ScreenShell title="Mi actividad" subtitle="Tu progreso de estudio y lo que viene">
-        {/* SEGMENTOS */}
         <View
           className="mt-2 flex-row rounded-full p-1"
           style={{ backgroundColor: colors.surface }}
@@ -162,7 +159,6 @@ export default function ActivityScreen() {
 
         {segment === 'actividad' ? (
           <>
-            {/* RACHA */}
             <View
               className="mt-4 rounded-[22px] border p-[18px]"
               style={{
@@ -186,7 +182,6 @@ export default function ActivityScreen() {
                   </Text>
                 </View>
 
-                {/* Congelaciones: cubren un día perdido sin romper la racha. */}
                 <TouchableOpacity
                   className="flex-row items-center rounded-full px-2.5 py-1.5"
                   style={{ backgroundColor: colors.card }}
@@ -207,7 +202,6 @@ export default function ActivityScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Semana actual */}
               <View className="mt-4 flex-row justify-between">
                 {streak.week.map((day) => (
                   <View key={day.key} className="items-center" style={{ width: 34 }}>
@@ -237,7 +231,6 @@ export default function ActivityScreen() {
                 ))}
               </View>
 
-              {/* Meta semanal */}
               <View className="mt-4">
                 <View className="mb-1.5 flex-row items-center justify-between">
                   <Text className="text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
@@ -264,7 +257,6 @@ export default function ActivityScreen() {
               </View>
             </View>
 
-            {/* META DIARIA */}
             <Card className="mt-3">
               <TouchableOpacity
                 className="p-4"
@@ -303,7 +295,6 @@ export default function ActivityScreen() {
               </TouchableOpacity>
             </Card>
 
-            {/* RESUMEN */}
             <View className="mt-3 flex-row gap-3">
               {[
                 { label: 'hoy', value: formatMinutes(stats.todayMinutes), icon: 'today-outline' as const, color: Palette.accentBlue },
@@ -330,7 +321,6 @@ export default function ActivityScreen() {
               ))}
             </View>
 
-            {/* ÚLTIMOS 7 DÍAS */}
             <SectionTitle>Últimos 7 días</SectionTitle>
             <Card>
               <View className="flex-row items-end justify-between px-3.5 pb-3 pt-4" style={{ height: 132 }}>
@@ -344,8 +334,6 @@ export default function ActivityScreen() {
                       <View
                         className="w-[60%] rounded-t-lg"
                         style={{
-                          // Mínimo visible para que los días sin estudio no
-                          // desaparezcan del gráfico.
                           height: Math.max(ratio * 74, 4),
                           backgroundColor: day.minutes > 0 ? Palette.accentBlue : colors.cardBorder,
                           opacity: day.isToday ? 1 : 0.75,
@@ -363,7 +351,6 @@ export default function ActivityScreen() {
               </View>
             </Card>
 
-            {/* POR MATERIA */}
             {stats.bySubject.length > 0 ? (
               <>
                 <SectionTitle>Por materia</SectionTitle>
@@ -404,7 +391,6 @@ export default function ActivityScreen() {
               </>
             ) : null}
 
-            {/* HISTORIAL */}
             <SectionTitle>Historial reciente</SectionTitle>
             {sessions.length === 0 ? (
               <Card>
@@ -464,7 +450,6 @@ export default function ActivityScreen() {
           </>
         ) : (
           <>
-            {/* CALENDARIO */}
             <Card className="mt-4">
               <View className="p-3.5">
                 <View className="mb-3 flex-row items-center justify-between">
@@ -511,7 +496,6 @@ export default function ActivityScreen() {
                     return (
                       <TouchableOpacity
                         key={cell.key}
-                        // 7 columnas exactas; el alto fijo evita saltos de fila.
                         style={{ width: `${100 / 7}%`, height: 44 }}
                         className="items-center justify-center"
                         activeOpacity={0.7}
@@ -558,7 +542,6 @@ export default function ActivityScreen() {
               </View>
             </Card>
 
-            {/* DÍA SELECCIONADO */}
             <SectionTitle>{describeEventDate(selectedDay)}</SectionTitle>
 
             {selectedEvents.length === 0 ? (
@@ -622,7 +605,6 @@ export default function ActivityScreen() {
               <Text className="text-sm font-bold text-white">Agregar evento</Text>
             </TouchableOpacity>
 
-            {/* PRÓXIMOS EVENTOS */}
             <SectionTitle>Próximos eventos</SectionTitle>
             {upcoming.length === 0 ? (
               <Card>
@@ -686,7 +668,6 @@ export default function ActivityScreen() {
         )}
       </ScreenShell>
 
-      {/* MODAL: NUEVO EVENTO */}
       <Modal
         visible={isEventModalVisible}
         transparent
@@ -720,9 +701,6 @@ export default function ActivityScreen() {
               {describeEventDate(selectedDay)} · {selectedDay}
             </Text>
 
-            {/* El formulario va en un scroll con flexShrink (no flex-1: el
-                contenedor solo tiene maxHeight y en iOS un hijo con flex:1
-                colapsa a 0). Así el botón Guardar queda siempre visible. */}
             <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
               <TextInput
                 className="mb-3 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
@@ -760,8 +738,6 @@ export default function ActivityScreen() {
                 placeholderTextColor="#6B7280"
                 value={eventTime}
                 onChangeText={setEventTime}
-                // El teclado numérico de Android no trae ":", así que ahí se usa
-                // el normal y la validación se encarga del formato.
                 keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
                 maxLength={5}
               />
