@@ -92,6 +92,8 @@ export async function clearPersistedState(keys: string[]) {
 
 export const STORAGE_KEYS = [
   'foxy:theme-preference',
+  'foxy:session',
+  'foxy:onboarding-seen',
   'foxy:user-name',
   'foxy:avatar',
   'foxy:account',
