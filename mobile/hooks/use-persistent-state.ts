@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Listener = (serialized: string | null, from: symbol) => void;
@@ -9,8 +9,16 @@ function broadcast(key: string, serialized: string | null, from: symbol) {
   listeners.get(key)?.forEach((listener) => listener(serialized, from));
 }
 
+function safeParse<T>(raw: string): T | undefined {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 export function usePersistentState<T>(key: string, initialValue: T) {
-  const [value, setValue] = useState<T>(initialValue);
+  const [value, setStoredValue] = useState<T>(initialValue);
   const [hydrated, setHydrated] = useState(false);
 
   const instanceId = useRef<symbol>(Symbol(key));
@@ -20,20 +28,41 @@ export function usePersistentState<T>(key: string, initialValue: T) {
     initialRef.current = initialValue;
   });
 
+  const pending = useRef<((prev: T) => T)[]>([]);
+  const hydratedRef = useRef(false);
+
+  const setValue = useCallback((next: T | ((prev: T) => T)) => {
+    const updater = typeof next === 'function' ? (next as (prev: T) => T) : () => next;
+    if (!hydratedRef.current) pending.current.push(updater);
+    setStoredValue(updater);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
     AsyncStorage.getItem(key)
       .then((raw) => {
-        if (cancelled || raw == null) return;
-        try {
-          setValue(JSON.parse(raw) as T);
-          lastSerialized.current = raw;
-        } catch {}
+        if (cancelled) return;
+
+        const stored = raw == null ? undefined : safeParse<T>(raw);
+        const queued = pending.current;
+        pending.current = [];
+
+        if (stored !== undefined) lastSerialized.current = raw;
+
+        if (queued.length > 0) {
+          const base = stored !== undefined ? stored : initialRef.current;
+          setStoredValue(queued.reduce((acc, updater) => updater(acc), base));
+          return;
+        }
+
+        if (stored !== undefined) setStoredValue(stored);
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setHydrated(true);
+        if (cancelled) return;
+        hydratedRef.current = true;
+        setHydrated(true);
       });
 
     return () => {
@@ -48,15 +77,15 @@ export function usePersistentState<T>(key: string, initialValue: T) {
 
       if (serialized === null) {
         lastSerialized.current = null;
-        setValue(initialRef.current);
+        setStoredValue(initialRef.current);
         return;
       }
 
       if (lastSerialized.current === serialized) return;
       lastSerialized.current = serialized;
-      try {
-        setValue(JSON.parse(serialized) as T);
-      } catch {}
+
+      const parsed = safeParse<T>(serialized);
+      if (parsed !== undefined) setStoredValue(parsed);
     };
 
     const set = listeners.get(key) ?? new Set<Listener>();
@@ -102,11 +131,13 @@ export const STORAGE_KEYS = [
   'foxy:school',
   'foxy:grade',
   'foxy:recent-exams',
+  'foxy:study-plans',
   'foxy:classrooms',
   'foxy:streak',
   'foxy:activity-log',
   'foxy:events',
   'foxy:questions',
+  'foxy:chat',
   'foxy:pending-question',
   'foxy:answer-mode',
   'foxy:plan',
@@ -123,10 +154,12 @@ export const SESSION_KEYS = [
   'foxy:school',
   'foxy:grade',
   'foxy:recent-exams',
+  'foxy:study-plans',
   'foxy:classrooms',
   'foxy:activity-log',
   'foxy:events',
   'foxy:questions',
+  'foxy:chat',
   'foxy:usage',
   'foxy:focus-session',
 ];

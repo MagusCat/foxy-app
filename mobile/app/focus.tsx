@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { Card, ChipGroup, Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
+import { WheelHighlight, WheelPicker } from '@/components/wheel-picker';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
@@ -11,20 +12,19 @@ import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { formatClock, useFocusSession } from '@/hooks/use-focus-session';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { formatMinutes, useStudyActivity } from '@/hooks/use-study-activity';
 
-const DURATIONS = [
-  { value: '15', label: '15 min' },
-  { value: '25', label: '25 min' },
-  { value: '45', label: '45 min' },
-  { value: '60', label: '60 min' },
-];
+const PRESETS = [15, 25, 45, 60];
+
+const CUSTOM_MINUTES = Array.from({ length: 24 }, (_, index) => `${(index + 1) * 5}`);
 
 export default function FocusScreen() {
   const { isDark, colors } = useTheme();
   const { logSession, stats } = useStudyActivity();
   const [, , markStudied] = useDailyStreak();
   const goal = useDailyGoal();
+  const sheetPaddingBottom = useSheetPaddingBottom();
 
   const [subjects] = usePersistentState<string[]>('foxy:subjects', ['Matemáticas']);
   const [selectedSubject, setSelectedSubject] = usePersistentState('foxy:selected-subject', 'Matemáticas');
@@ -33,9 +33,13 @@ export default function FocusScreen() {
   const minutes = session.minutes;
   const remaining = secondsLeft;
 
-  const accent = getSubjectAccent(selectedSubject, isDark);
+  const [isCustomVisible, setCustomVisible] = useState(false);
+  const [customDraft, setCustomDraft] = useState(`${minutes}`);
 
-  const finish = useCallback(
+  const accent = getSubjectAccent(selectedSubject, isDark);
+  const isPreset = PRESETS.includes(minutes);
+
+  const finishEarly = useCallback(
     (completedMinutes: number) => {
       reset();
 
@@ -50,18 +54,9 @@ export default function FocusScreen() {
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        '¡Sesión completada! 🎉',
-        `${completedMinutes} minutos de ${selectedSubject} sumados a tu actividad de hoy.`,
-      );
     },
     [logSession, markStudied, reset, selectedSubject],
   );
-
-  useEffect(() => {
-    if (!isRunning || secondsLeft > 0) return;
-    finish(minutes);
-  }, [isRunning, secondsLeft, minutes, finish]);
 
   const handleStart = () => {
     start();
@@ -81,14 +76,17 @@ export default function FocusScreen() {
       [
         { text: 'Seguir estudiando', style: 'cancel' },
         { text: 'Descartar', style: 'destructive', onPress: reset },
-        { text: 'Guardar', onPress: () => finish(done) },
+        { text: 'Guardar', onPress: () => finishEarly(done) },
       ],
     );
   };
 
-  const changeDuration = (value: string) => setMinutes(Number(value));
+  const openCustom = () => {
+    setCustomDraft(`${minutes}`);
+    setCustomVisible(true);
+  };
 
-  const elapsedRatio = 1 - remaining / (minutes * 60);
+  const elapsedRatio = minutes > 0 ? Math.min(Math.max(1 - remaining / (minutes * 60), 0), 1) : 0;
 
   return (
     <ScreenShell title="Modo enfoque" subtitle="Estudia sin distracciones y suma minutos reales">
@@ -151,24 +149,76 @@ export default function FocusScreen() {
       <SectionTitle>Duración</SectionTitle>
       <Card>
         <View className="p-3.5">
-          <ChipGroup
-            options={DURATIONS}
-            selected={`${minutes}`}
-            onSelect={changeDuration}
-            accent={accent.color}
-          />
+          <View className="flex-row flex-wrap gap-2">
+            {PRESETS.map((preset) => {
+              const isSelected = minutes === preset;
+              return (
+                <TouchableOpacity
+                  key={preset}
+                  className="rounded-2xl border-[1.5px] px-3.5 py-2"
+                  style={{
+                    borderColor: isSelected ? accent.color : colors.cardBorder,
+                    backgroundColor: isSelected ? softTint(accent.color, isDark) : colors.card,
+                  }}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => setMinutes(preset)}
+                >
+                  <Text
+                    className="text-[13px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
+                    style={isSelected ? { color: accent.color, fontWeight: '700' } : undefined}
+                  >
+                    {preset} min
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            <TouchableOpacity
+              className="flex-row items-center rounded-2xl border-[1.5px] px-3.5 py-2"
+              style={{
+                borderColor: isPreset ? colors.cardBorder : accent.color,
+                backgroundColor: isPreset ? colors.card : softTint(accent.color, isDark),
+              }}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityState={{ selected: !isPreset }}
+              accessibilityLabel="Elegir una duración personalizada"
+              onPress={openCustom}
+            >
+              <Ionicons
+                name="options-outline"
+                size={14}
+                color={isPreset ? colors.icon : accent.color}
+                style={{ marginRight: 5 }}
+              />
+              <Text
+                className="text-[13px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
+                style={isPreset ? undefined : { color: accent.color, fontWeight: '700' }}
+              >
+                {isPreset ? 'Personalizado' : `${minutes} min`}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Card>
 
       <SectionTitle>Materia</SectionTitle>
       <Card>
         <View className="p-3.5">
-          <ChipGroup
-            options={subjects.slice(0, 8).map((subject) => ({ value: subject, label: subject }))}
-            selected={selectedSubject}
-            onSelect={setSelectedSubject}
-            accent={accent.color}
-          />
+          {subjects.length === 0 ? (
+            <Text className="text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
+              Todavía no tienes materias. Márcalas en Mi escuela.
+            </Text>
+          ) : (
+            <ChipGroup
+              options={subjects.map((subject) => ({ value: subject, label: subject }))}
+              selected={selectedSubject}
+              onSelect={setSelectedSubject}
+              accent={accent.color}
+            />
+          )}
         </View>
       </Card>
 
@@ -203,6 +253,74 @@ export default function FocusScreen() {
         Deja el teléfono a un lado: el temporizador sigue contando aunque vuelvas a Inicio o cierres
         la app, y al terminar suma los minutos a tu actividad y a tu racha.
       </Note>
+
+      <Modal
+        visible={isCustomVisible}
+        transparent
+        statusBarTranslucent
+        navigationBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setCustomVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
+          <TouchableOpacity
+            className="flex-1"
+            activeOpacity={1}
+            onPress={() => setCustomVisible(false)}
+          />
+
+          <View
+            className="rounded-t-[26px] px-[18px] pt-[18px]"
+            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+          >
+            <View className="mb-1 flex-row items-center">
+              <View className="h-[34px] w-[34px]" />
+              <Text className="flex-1 text-center text-[17px] font-bold text-text-primary-light dark:text-text-primary-dark">
+                Duración personalizada
+              </Text>
+              <TouchableOpacity
+                className="h-[34px] w-[34px] items-center justify-center rounded-full"
+                style={{ backgroundColor: colors.surface }}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+                onPress={() => setCustomVisible(false)}
+              >
+                <Ionicons name="close" size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View className="my-2 items-center">
+              <View className="relative flex-row items-center justify-center">
+                <WheelHighlight />
+                <WheelPicker
+                  options={CUSTOM_MINUTES}
+                  value={customDraft}
+                  onChange={setCustomDraft}
+                  width={92}
+                  accessibilityLabel="Minutos de la sesión"
+                />
+                <Text className="ml-2 text-[17px] font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                  minutos
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              className="mt-2 items-center rounded-[18px] py-4"
+              style={{ backgroundColor: accent.color }}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Usar esta duración"
+              onPress={() => {
+                setMinutes(Number(customDraft));
+                setCustomVisible(false);
+              }}
+            >
+              <Text className="text-[15px] font-bold text-white">Usar {customDraft} minutos</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScreenShell>
   );
 }

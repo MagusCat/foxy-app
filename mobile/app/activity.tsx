@@ -1,37 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useRouter } from 'expo-router';
 
-import { Card, ChipGroup, Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
+import { Card, Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
-import {
-  EVENT_KIND_META,
-  MONTH_NAMES,
-  WEEKDAY_LABELS,
-  buildMonthGrid,
-  describeEventDate,
-  localDay,
-  type EventKind,
-} from '@/hooks/use-agenda';
-import { useAgenda } from '@/hooks/use-agenda';
+import { MONTH_NAMES } from '@/hooks/use-agenda';
 import { MAX_FREEZES, useDailyStreak } from '@/hooks/use-daily-streak';
-import { usePersistentState } from '@/hooks/use-persistent-state';
-import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { STUDY_KIND_META, formatMinutes, useStudyActivity } from '@/hooks/use-study-activity';
-
-type Segment = 'actividad' | 'calendario';
-
-const KIND_OPTIONS: { value: EventKind; label: string }[] = [
-  { value: 'examen', label: 'Examen' },
-  { value: 'tarea', label: 'Tarea' },
-  { value: 'clase', label: 'Clase' },
-  { value: 'repaso', label: 'Repaso' },
-];
 
 function describeMoment(iso: string) {
   const date = new Date(iso);
@@ -53,74 +33,15 @@ function describeMoment(iso: string) {
 export default function ActivityScreen() {
   const router = useRouter();
   const { isDark, colors } = useTheme();
-  const sheetPaddingBottom = useSheetPaddingBottom();
   const goal = useDailyGoal();
 
-  const [segment, setSegment] = useState<Segment>('actividad');
   const [, streak] = useDailyStreak();
   const { sessions, stats } = useStudyActivity();
-  const { upcoming, markedDays, addEvent, removeEvent } = useAgenda();
-  const [subjects] = usePersistentState<string[]>('foxy:subjects', ['Matemáticas']);
 
-  const today = localDay(new Date());
-  const [cursor, setCursor] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
-  });
-  const [selectedDay, setSelectedDay] = useState(today);
-
-  const [isEventModalVisible, setEventModalVisible] = useState(false);
-  const [eventTitle, setEventTitle] = useState('');
-  const [eventKind, setEventKind] = useState<EventKind>('examen');
-  const [eventSubject, setEventSubject] = useState(subjects[0] ?? 'Matemáticas');
-  const [eventTime, setEventTime] = useState('');
-
-  const grid = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
-  const selectedEvents = markedDays.get(selectedDay) ?? [];
   const accent = isDark ? Palette.primaryGlow : Palette.primary;
 
-  const shiftMonth = (amount: number) => {
-    setCursor((prev) => {
-      const date = new Date(prev.year, prev.month + amount, 1);
-      return { year: date.getFullYear(), month: date.getMonth() };
-    });
-  };
-
-  const openEventModal = () => {
-    setEventTitle('');
-    setEventTime('');
-    setEventKind('examen');
-    setEventSubject(subjects[0] ?? 'Matemáticas');
-    setEventModalVisible(true);
-  };
-
-  const handleSaveEvent = () => {
-    const title = eventTitle.trim();
-    if (!title) {
-      Alert.alert('Falta el título', 'Escribe de qué se trata el evento.');
-      return;
-    }
-
-    const time = eventTime.trim();
-    if (time && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) {
-      Alert.alert('Hora no válida', 'Usa el formato de 24 horas, por ejemplo 08:30 o 17:45.');
-      return;
-    }
-
-    addEvent({ title, subject: eventSubject, kind: eventKind, date: selectedDay, time: time || undefined });
-    setEventModalVisible(false);
-  };
-
-  const handleDeleteEvent = (id: string, title: string) => {
-    Alert.alert('Eliminar evento', `¿Quitar "${title}" de tu calendario?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => removeEvent(id) },
-    ]);
-  };
-
   return (
-    <>
-      <ScreenShell title="Mi actividad" subtitle="Tu progreso de estudio y lo que viene">
+    <ScreenShell title="Mi actividad" subtitle="Tu progreso de estudio y lo que viene">
         <View
           className="mt-2 flex-row rounded-full p-1"
           style={{ backgroundColor: colors.surface }}
@@ -129,7 +50,7 @@ export default function ActivityScreen() {
             { value: 'actividad' as const, label: 'Actividad', icon: 'stats-chart-outline' as const },
             { value: 'calendario' as const, label: 'Calendario', icon: 'calendar-outline' as const },
           ]).map((option) => {
-            const isSelected = segment === option.value;
+            const isSelected = option.value === 'actividad';
             return (
               <TouchableOpacity
                 key={option.value}
@@ -138,7 +59,9 @@ export default function ActivityScreen() {
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isSelected }}
-                onPress={() => setSegment(option.value)}
+                onPress={() => {
+                  if (option.value === 'calendario') router.push('/calendar');
+                }}
               >
                 <Ionicons
                   name={option.icon}
@@ -157,8 +80,7 @@ export default function ActivityScreen() {
           })}
         </View>
 
-        {segment === 'actividad' ? (
-          <>
+        <>
             <View
               className="mt-4 rounded-[22px] border p-[18px]"
               style={{
@@ -447,312 +369,7 @@ export default function ActivityScreen() {
             <Note icon="lock-closed-outline">
               Tu actividad se guarda solo en este dispositivo mientras no exista la cuenta en línea.
             </Note>
-          </>
-        ) : (
-          <>
-            <Card className="mt-4">
-              <View className="p-3.5">
-                <View className="mb-3 flex-row items-center justify-between">
-                  <TouchableOpacity
-                    className="h-8 w-8 items-center justify-center rounded-full"
-                    style={{ backgroundColor: colors.surface }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Mes anterior"
-                    onPress={() => shiftMonth(-1)}
-                  >
-                    <Ionicons name="chevron-back" size={16} color={colors.text} />
-                  </TouchableOpacity>
-
-                  <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
-                    {MONTH_NAMES[cursor.month]} {cursor.year}
-                  </Text>
-
-                  <TouchableOpacity
-                    className="h-8 w-8 items-center justify-center rounded-full"
-                    style={{ backgroundColor: colors.surface }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Mes siguiente"
-                    onPress={() => shiftMonth(1)}
-                  >
-                    <Ionicons name="chevron-forward" size={16} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-
-                <View className="mb-1 flex-row">
-                  {WEEKDAY_LABELS.map((label, index) => (
-                    <View key={`${label}-${index}`} className="flex-1 items-center">
-                      <Text className="text-[10px] font-bold text-text-secondary-light dark:text-text-secondary-dark">
-                        {label}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-
-                <View className="flex-row flex-wrap">
-                  {grid.map((cell) => {
-                    const events = markedDays.get(cell.key) ?? [];
-                    const isSelected = cell.key === selectedDay;
-
-                    return (
-                      <TouchableOpacity
-                        key={cell.key}
-                        style={{ width: `${100 / 7}%`, height: 44 }}
-                        className="items-center justify-center"
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Día ${cell.day}${events.length ? `, ${events.length} eventos` : ''}`}
-                        onPress={() => {
-                          setSelectedDay(cell.key);
-                          if (cell.isOutside) {
-                            const date = new Date(`${cell.key}T00:00:00`);
-                            setCursor({ year: date.getFullYear(), month: date.getMonth() });
-                          }
-                        }}
-                      >
-                        <View
-                          className="h-8 w-8 items-center justify-center rounded-full border"
-                          style={{
-                            backgroundColor: isSelected ? accent : 'transparent',
-                            borderColor: cell.isToday && !isSelected ? accent : 'transparent',
-                            borderWidth: cell.isToday && !isSelected ? 1.5 : 1,
-                            opacity: cell.isOutside ? 0.35 : 1,
-                          }}
-                        >
-                          <Text
-                            className="text-xs font-semibold"
-                            style={{ color: isSelected ? '#FFFFFF' : colors.text }}
-                          >
-                            {cell.day}
-                          </Text>
-                        </View>
-
-                        <View className="mt-0.5 h-1 flex-row items-center gap-0.5">
-                          {events.slice(0, 3).map((event) => (
-                            <View
-                              key={event.id}
-                              className="h-1 w-1 rounded-full"
-                              style={{ backgroundColor: EVENT_KIND_META[event.kind].color }}
-                            />
-                          ))}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </Card>
-
-            <SectionTitle>{describeEventDate(selectedDay)}</SectionTitle>
-
-            {selectedEvents.length === 0 ? (
-              <Card>
-                <View className="items-center px-5 py-6">
-                  <Ionicons name="calendar-clear-outline" size={24} color={colors.icon} />
-                  <Text className="mt-2 text-center text-xs text-text-secondary-light dark:text-text-secondary-dark">
-                    No hay nada agendado este día.
-                  </Text>
-                </View>
-              </Card>
-            ) : (
-              <Card>
-                <View className="p-2">
-                  {selectedEvents.map((event) => {
-                    const meta = EVENT_KIND_META[event.kind];
-                    return (
-                      <View key={event.id} className="flex-row items-center px-1.5 py-2.5">
-                        <View
-                          className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: softTint(meta.color, isDark) }}
-                        >
-                          <Ionicons name={meta.icon} size={17} color={meta.color} />
-                        </View>
-                        <View className="flex-1">
-                          <Text
-                            className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark"
-                            numberOfLines={1}
-                          >
-                            {event.title}
-                          </Text>
-                          <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                            {meta.label} · {event.subject}
-                            {event.time ? ` · ${event.time}` : ''}
-                          </Text>
-                        </View>
-                        <TouchableOpacity
-                          className="h-8 w-8 items-center justify-center rounded-full"
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Eliminar ${event.title}`}
-                          onPress={() => handleDeleteEvent(event.id, event.title)}
-                        >
-                          <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </View>
-              </Card>
-            )}
-
-            <TouchableOpacity
-              className="mt-3 flex-row items-center justify-center rounded-[18px] bg-primary py-3.5"
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Agregar evento"
-              onPress={openEventModal}
-            >
-              <Ionicons name="add" size={18} color="#FFFFFF" style={{ marginRight: 5 }} />
-              <Text className="text-sm font-bold text-white">Agregar evento</Text>
-            </TouchableOpacity>
-
-            <SectionTitle>Próximos eventos</SectionTitle>
-            {upcoming.length === 0 ? (
-              <Card>
-                <View className="items-center px-5 py-8">
-                  <Ionicons name="calendar-outline" size={28} color={colors.icon} />
-                  <Text className="mt-2.5 text-center text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    Sin eventos por ahora
-                  </Text>
-                  <Text className="mt-1 text-center text-xs leading-[17px] text-text-secondary-light dark:text-text-secondary-dark">
-                    Agenda tu próximo examen o entrega y Foxy te ayudará a prepararte a tiempo.
-                  </Text>
-                </View>
-              </Card>
-            ) : (
-              <Card>
-                <View className="p-2">
-                  {upcoming.slice(0, 8).map((event) => {
-                    const meta = EVENT_KIND_META[event.kind];
-                    return (
-                      <TouchableOpacity
-                        key={event.id}
-                        className="flex-row items-center px-1.5 py-2.5"
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          const date = new Date(`${event.date}T00:00:00`);
-                          setCursor({ year: date.getFullYear(), month: date.getMonth() });
-                          setSelectedDay(event.date);
-                        }}
-                      >
-                        <View
-                          className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: softTint(meta.color, isDark) }}
-                        >
-                          <Ionicons name={meta.icon} size={17} color={meta.color} />
-                        </View>
-                        <View className="flex-1">
-                          <Text
-                            className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark"
-                            numberOfLines={1}
-                          >
-                            {event.title}
-                          </Text>
-                          <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                            {meta.label} · {event.subject}
-                          </Text>
-                        </View>
-                        <Text className="ml-2 text-[11px] font-semibold" style={{ color: meta.color }}>
-                          {describeEventDate(event.date)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </Card>
-            )}
-
-            <Note icon="notifications-outline">
-              Cuando actives los recordatorios, Foxy te avisará un día antes de cada examen.
-            </Note>
-          </>
-        )}
-      </ScreenShell>
-
-      <Modal
-        visible={isEventModalVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setEventModalVisible(false)}
-      >
-        <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
-          <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setEventModalVisible(false)} />
-
-          <View
-            className="max-h-[88%] rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
-            style={{ paddingBottom: sheetPaddingBottom }}
-          >
-            <View className="mb-1 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-                Nuevo evento
-              </Text>
-              <TouchableOpacity
-                className="h-[30px] w-[30px] items-center justify-center rounded-full bg-[#F3F4F6] dark:bg-[#2A2533]"
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar"
-                onPress={() => setEventModalVisible(false)}
-              >
-                <Ionicons name="close" size={18} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <Text className="mb-3.5 text-xs text-text-secondary-light dark:text-text-secondary-dark">
-              {describeEventDate(selectedDay)} · {selectedDay}
-            </Text>
-
-            <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
-              <TextInput
-                className="mb-3 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
-                placeholder="Ej. Examen de ecuaciones"
-                placeholderTextColor="#6B7280"
-                value={eventTitle}
-                onChangeText={setEventTitle}
-                maxLength={60}
-              />
-
-              <Text className="mb-2 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
-                Tipo
-              </Text>
-              <View className="mb-3.5">
-                <ChipGroup options={KIND_OPTIONS} selected={eventKind} onSelect={setEventKind} />
-              </View>
-
-              <Text className="mb-2 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
-                Materia
-              </Text>
-              <View className="mb-3.5">
-                <ChipGroup
-                  options={subjects.slice(0, 8).map((subject) => ({ value: subject, label: subject }))}
-                  selected={eventSubject}
-                  onSelect={setEventSubject}
-                />
-              </View>
-
-              <Text className="mb-2 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
-                Hora (opcional)
-              </Text>
-              <TextInput
-                className="mb-3 rounded-[14px] border border-[#E5E7EB] bg-[#F9FAFB] px-3.5 py-2.5 text-sm text-text-primary-light dark:border-[#2D2838] dark:bg-[#14121A] dark:text-text-primary-dark"
-                placeholder="08:30"
-                placeholderTextColor="#6B7280"
-                value={eventTime}
-                onChangeText={setEventTime}
-                keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                maxLength={5}
-              />
-            </ScrollView>
-
-            <TouchableOpacity
-              className="mt-1 items-center rounded-[18px] bg-primary py-3.5"
-              activeOpacity={0.85}
-              onPress={handleSaveEvent}
-            >
-              <Text className="text-sm font-bold text-white">Guardar evento</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </>
+        </>
+    </ScreenShell>
   );
 }
