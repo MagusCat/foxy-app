@@ -17,7 +17,6 @@ import {
   type LearningPrefs,
 } from '@/hooks/use-learning-prefs';
 
-/** Bloque de "título + descripción + opciones", que se repite en toda la pantalla. */
 function PrefBlock({
   title,
   description,

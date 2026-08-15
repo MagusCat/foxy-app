@@ -48,7 +48,6 @@ export default function AboutFoxScreen() {
 
   return (
     <ScreenShell title="¿Qué es Fox?" subtitle="La app, el zorro y para qué sirven">
-      {/* HERO */}
       <LinearGradient
         colors={[Palette.primary, Palette.accentBlue]}
         start={{ x: 0, y: 0 }}
