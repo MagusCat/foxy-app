@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 import { GoalBar } from '@/components/goal-bar';
@@ -75,21 +74,19 @@ export default function ExamsScreen() {
             accessibilityLabel="Ver los planes de suscripción"
             onPress={() => router.push('/subscription')}
           >
-            <LinearGradient
-              colors={[Palette.primary, Palette.accentBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+            <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 height: 36,
                 paddingHorizontal: 18,
                 borderRadius: 18,
+                backgroundColor: Palette.primary,
               }}
             >
               <Text className="text-[14px] font-bold text-white">Comprar</Text>
               <Ionicons name="sparkles" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           <View className="flex-1 flex-row justify-end">
