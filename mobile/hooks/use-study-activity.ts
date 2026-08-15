@@ -5,7 +5,6 @@ import { usePersistentState } from '@/hooks/use-persistent-state';
 
 const STORAGE_KEY = 'foxy:activity-log';
 
-/** Sesiones que se conservan en el dispositivo. */
 const MAX_SESSIONS = 200;
 
 export type StudyKind = 'chat' | 'scan' | 'exam' | 'lesson' | 'class';
@@ -15,9 +14,7 @@ export type StudySession = {
   kind: StudyKind;
   subject: string;
   title: string;
-  /** Duración estimada en minutos: frontend hasta que exista el backend. */
   minutes: number;
-  /** ISO: en disco se guarda como JSON, donde `Date` no sobrevive. */
   at: string;
 };
 
@@ -44,7 +41,6 @@ export type SubjectTotal = {
   subject: string;
   minutes: number;
   sessions: number;
-  /** Proporción respecto a la materia más estudiada, para las barras. */
   ratio: number;
 };
 
@@ -55,13 +51,6 @@ export type DayTotal = {
   isToday: boolean;
 };
 
-/**
- * Registro de estudio del usuario.
- *
- * Alimenta la pantalla de Actividad. Cada acción real de la app (enviar una
- * pregunta, generar un examen) llama a `logSession`, así que los totales
- * salen de lo que la persona hizo y no de datos inventados.
- */
 export function useStudyActivity() {
   const [sessions, setSessions, hydrated] = usePersistentState<StudySession[]>(STORAGE_KEY, []);
 
@@ -83,7 +72,6 @@ export function useStudyActivity() {
     const now = new Date();
     const today = localDay(now);
 
-    // Últimos 7 días, del más antiguo al de hoy.
     const days: DayTotal[] = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(now);
       date.setDate(date.getDate() - (6 - index));
@@ -93,7 +81,6 @@ export function useStudyActivity() {
     const dayIndex = new Map(days.map((day, index) => [day.key, index]));
 
     const subjectMinutes = new Map<string, { minutes: number; sessions: number }>();
-    /** Minutos por día de todo el historial: lo usan las metas y los logros. */
     const minutesByDay = new Map<string, number>();
     let totalMinutes = 0;
     let todayMinutes = 0;
@@ -147,7 +134,6 @@ export function useStudyActivity() {
   return { sessions, logSession, clearSessions, stats, hydrated };
 }
 
-/** "45 min" / "2 h 15 min" */
 export function formatMinutes(minutes: number): string {
   if (minutes <= 0) return '0 min';
   if (minutes < 60) return `${minutes} min`;

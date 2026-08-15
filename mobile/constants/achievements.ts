@@ -8,7 +8,6 @@ export type Achievement = {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-  /** Cuánto lleva el usuario y cuánto necesita. */
   progress: number;
   target: number;
   unlocked: boolean;
@@ -30,7 +29,6 @@ type Source = {
   goalsMet: number;
 };
 
-/** Un logro con su progreso ya recortado al objetivo. */
 function make(
   id: string,
   title: string,
@@ -44,13 +42,6 @@ function make(
   return { id, title, description, icon, color, progress: clamped, target, unlocked: clamped >= target };
 }
 
-/**
- * Logros derivados de lo que el usuario ya hizo.
- *
- * No se guardan aparte a propósito: se recalculan desde la racha, la
- * actividad y la agenda, así que nunca pueden quedar desincronizados ni
- * inventar progreso que no existe.
- */
 export function buildAchievements(source: Source): AchievementGroup[] {
   return [
     {

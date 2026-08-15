@@ -12,13 +12,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
-import { MathKeyboard } from '@/components/math-keyboard';
 import { useScreenPadding } from '@/components/screen-header';
 import { useAgenda, describeEventDate, daysUntil, EVENT_KIND_META } from '@/hooks/use-agenda';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
@@ -29,6 +27,7 @@ import {
   type AnswerMode,
 } from '@/hooks/use-question-history';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
+import { formatClock, useFocusSession } from '@/hooks/use-focus-session';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
@@ -36,7 +35,6 @@ import { useAttachments, describeAttachment } from '@/hooks/use-attachments';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useStudyActivity } from '@/hooks/use-study-activity';
 
-/** Formatos de lección que Foxy podrá generar. */
 const LESSON_TYPES: { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
   { label: 'Cuestionario', icon: 'help-circle-outline', color: Palette.accentBlue },
   { label: 'Examen oral simulado', icon: 'mic-outline', color: Palette.accentPurple },
@@ -44,14 +42,6 @@ const LESSON_TYPES: { label: string; icon: keyof typeof Ionicons.glyphMap; color
   { label: 'Podcast', icon: 'headset-outline', color: '#EC4899' },
   { label: 'Tarjetas de memoria', icon: 'albums-outline', color: Palette.flameOrange },
   { label: 'Examen escrito simulado', icon: 'create-outline', color: '#14B8A6' },
-];
-
-const MOOD_OPTIONS: { emoji: string; label: string }[] = [
-  { emoji: '😄', label: 'Genial' },
-  { emoji: '🙂', label: 'Bien' },
-  { emoji: '😐', label: 'Neutral' },
-  { emoji: '😕', label: 'Cansado' },
-  { emoji: '😣', label: 'Estresado' },
 ];
 
 const INITIAL_SUBJECTS = [
@@ -73,10 +63,8 @@ const INITIAL_SUBJECTS = [
 
 const isIOS = Platform.OS === 'ios';
 
-// iOS usa objetivos táctiles ligeramente más grandes que Android.
 const ACTION_CIRCLE = isIOS ? 'h-10 w-10' : 'h-9 w-9';
 const CAMERA_PILL = isIOS ? 'h-10 w-12' : 'h-9 w-11';
-/** Alto común de la barra superior: racha, plan y avatar deben coincidir. */
 const HEADER_PILL = 'h-9';
 const TALK_PILL = isIOS ? 'h-10' : 'h-9';
 const ACTION_ICON_SIZE = isIOS ? 20 : 18;
@@ -89,7 +77,6 @@ export default function HomeScreen() {
   const sheetPaddingBottom = useSheetPaddingBottom();
   const iconOnSurface = isDark ? Palette.textPrimaryDark : Palette.textPrimaryLight;
 
-  // Estados de la app (persistidos en el dispositivo)
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
   const [avatarUri] = usePersistentState('foxy:avatar', '');
   const [subjects, setSubjects] = usePersistentState<string[]>('foxy:subjects', INITIAL_SUBJECTS);
@@ -97,8 +84,8 @@ export default function HomeScreen() {
     'foxy:selected-subject',
     'Matemáticas',
   );
-  const [mood, setMood] = usePersistentState('foxy:mood', MOOD_OPTIONS[2]);
   const [streakCount, , markStudied] = useDailyStreak();
+  const focus = useFocusSession();
   const { plan, isBasic, remaining, reachedLimit, registerQuestion } = useSubscription();
   const { logSession } = useStudyActivity();
   const { addQuestion } = useQuestionHistory();
@@ -125,24 +112,16 @@ export default function HomeScreen() {
     setAnswerMode(ANSWER_MODES[(index + 1) % ANSWER_MODES.length].value);
   };
 
-  // Solo se anuncia lo que ya está encima: más allá de una semana estorba.
   const nextEvent = upcoming.find((event) => daysUntil(event.date) <= 7);
 
-  // Estados de edición y modales
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSubjectModalVisible, setSubjectModalVisible] = useState(false);
   const [subjectModalMode, setSubjectModalMode] = useState<'list' | 'add'>('list');
   const [newSubjectInput, setNewSubjectInput] = useState('');
   const [isOptionsModalVisible, setOptionsModalVisible] = useState(false);
-  const [isMoodModalVisible, setMoodModalVisible] = useState(false);
   const [isStartModalVisible, setStartModalVisible] = useState(false);
-  const [isMathKeyboardVisible, setMathKeyboardVisible] = useState(false);
   const [solverEnabled, setSolverEnabled] = useState(true);
 
-  /**
-   * "Volver a preguntar" desde el historial deja la pregunta aquí. Se carga en
-   * el campo y se limpia enseguida, para que no vuelva a aparecer sola.
-   */
   useEffect(() => {
     if (!pendingQuestion) return;
 
@@ -151,30 +130,16 @@ export default function HomeScreen() {
     setPendingQuestion(null);
   }, [pendingQuestion, setPendingQuestion, setSelectedSubject]);
 
-  /**
-   * Cierra la hoja de opciones antes de abrir otra cosa. En iOS no se puede
-   * presentar un modal mientras otro se está cerrando, y en Android el
-   * selector nativo se queda detrás de la hoja si no se espera.
-   */
   const closeOptionsThen = (action: () => void) => {
     setOptionsModalVisible(false);
     setTimeout(action, 260);
   };
 
-  /**
-   * Cierra el menú "Comenzar" y ejecuta la acción cuando ya terminó de
-   * cerrarse. Hacer ambas cosas en el mismo tick falla de dos formas: al
-   * navegar, el navegador congela la pantalla antes de aplicar el cierre y el
-   * modal se queda abierto; y en iOS no se puede presentar nada nuevo (cámara,
-   * Alert) mientras otro modal se está cerrando.
-   */
   const closeStartModalThen = (action: () => void) => {
     setStartModalVisible(false);
     setTimeout(action, 260);
   };
 
-  // Acciones del menú "Comenzar". Todo frontend: lo que necesita IA lo
-  // decimos claramente, y lo que ya existe en la app navega de verdad.
   const handleScanProblem = () => closeStartModalThen(addFromCamera);
 
   const handleLessonType = (label: string) =>
@@ -188,10 +153,6 @@ export default function HomeScreen() {
   const goToTab = (path: '/(tabs)/exams' | '/(tabs)/class') =>
     closeStartModalThen(() => router.push(path));
 
-  // Enviar: la IA todavía no está conectada, así que confirmamos lo que se
-  // enviará en cuanto exista el backend en lugar de fingir una respuesta.
-  // Aun así el envío cuenta de verdad para la racha, la actividad y el cupo
-  // diario del plan, que sí son parte del frontend.
   const handleSend = () => {
     if (!canSend) return;
 
@@ -242,7 +203,6 @@ export default function HomeScreen() {
     Alert.alert('Próximamente', `${feature} estará disponible muy pronto.`);
   };
 
-  // Agregar nueva materia
   const handleAddSubjectSubmit = () => {
     const trimmed = newSubjectInput.trim();
     if (!trimmed) {
@@ -259,7 +219,6 @@ export default function HomeScreen() {
     setSubjectModalMode('list');
   };
 
-  // Eliminar materia (con confirmación)
   const handleDeleteSubject = (subjectToDelete: string) => {
     if (subjects.length <= 1) {
       Alert.alert('Atención', 'Debes conservar al menos una materia en tu lista.');
@@ -274,8 +233,6 @@ export default function HomeScreen() {
           text: 'Eliminar',
           style: 'destructive',
           onPress: () => {
-            // Se calcula fuera del updater: mutar otro estado dentro de
-            // setState provoca efectos duplicados en React 19.
             const updated = subjects.filter((s) => s !== subjectToDelete);
             setSubjects(updated);
             if (selectedSubject === subjectToDelete) {
@@ -299,10 +256,6 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* BARRA SUPERIOR (HEADER)
-            Racha y plan comparten forma y alto: son dos accesos del mismo
-            rango, así que se agrupan a la izquierda y el avatar queda solo a
-            la derecha. */}
         <View className="flex-row items-center justify-between pb-4">
           <View className="mr-2 flex-1 flex-row items-center gap-2">
             <TouchableOpacity
@@ -338,9 +291,27 @@ export default function HomeScreen() {
                 </Text>
               ) : null}
             </TouchableOpacity>
+
+            {focus.isRunning ? (
+              <TouchableOpacity
+                className={`${HEADER_PILL} flex-row items-center rounded-full border bg-surface-light px-3 dark:bg-surface-dark`}
+                style={{ borderColor: Palette.flameOrange }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Modo enfoque en curso, quedan ${formatClock(focus.secondsLeft)}. Volver al temporizador`}
+                onPress={() => router.push('/focus')}
+              >
+                <Ionicons name="timer-outline" size={14} color={Palette.flameOrange} />
+                <Text
+                  className="ml-1.5 text-[13px] font-bold"
+                  style={{ color: Palette.flameOrange, fontVariant: ['tabular-nums'] }}
+                >
+                  {formatClock(focus.secondsLeft)}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
-          {/* Avatar de Usuario */}
           <TouchableOpacity
             className={`${HEADER_PILL} aspect-square items-center justify-center overflow-hidden rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
             activeOpacity={0.8}
@@ -358,9 +329,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* SECCIÓN CENTRAL - BIENVENIDA
-            flex-1 hace que absorba el espacio entre el header y el input, así
-            el saludo queda centrado en la pantalla y no pegado arriba. */}
         <View className="flex-1 items-center justify-center py-8">
           <Text className="text-center text-[22px] font-bold tracking-[-0.3px] text-text-primary-light dark:text-text-primary-dark">
             ¡Hola {userName}! ¿Qué quiere estudiar hoy?
@@ -371,14 +339,8 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Comenzar"
             onPress={() => setStartModalVisible(true)}
-            className="mt-5 rounded-[22px]"
-            style={{
-              elevation: 8,
-              shadowColor: Palette.primary,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isDark ? 0.55 : 0.3,
-              shadowRadius: 10,
-            }}
+            className="mt-5 flex-row items-center rounded-[22px] px-[22px] py-3"
+            style={{ backgroundColor: Palette.primary }}
           >
             <LinearGradient
               colors={[Palette.primary, Palette.accentBlue]}
@@ -399,7 +361,6 @@ export default function HomeScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* ATAJOS DEL DÍA: la meta de estudio y lo que viene en el calendario */}
           <View className="mt-7 w-full gap-2">
             <TouchableOpacity
               className="flex-row items-center rounded-2xl border border-card-light-border bg-card-light px-3.5 py-3 dark:border-card-dark-border dark:bg-card-dark"
@@ -480,10 +441,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* PANEL INFERIOR DE ENTRADA Y SELECCIÓN DE MATERIA */}
         <View className="mt-auto w-full items-center">
           <View className="z-10 -mb-[13px] flex-row items-center gap-2">
-            {/* Selector de Materia */}
             <TouchableOpacity
               className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
               style={{ borderColor: subjectAccent.color, elevation: 4 }}
@@ -501,7 +460,6 @@ export default function HomeScreen() {
               <Ionicons name="swap-vertical" size={14} color={subjectAccent.color} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
 
-            {/* Modo de respuesta: rota entre las tres formas de responder. */}
             <TouchableOpacity
               className="flex-row items-center rounded-[18px] border border-card-light-border bg-white px-3 py-[7px] dark:border-surface-dark-border dark:bg-[#1B1522]"
               style={{ elevation: 4 }}
@@ -517,12 +475,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Panel Principal de Entrada */}
           <View
             className="w-full rounded-[22px] border bg-card-light px-3.5 pb-2.5 pt-5 dark:bg-card-dark"
             style={{ borderColor: subjectAccent.color }}
           >
-            {/* Adjuntos listos para enviar */}
             {attachments.length > 0 && (
               <ScrollView
                 horizontal
@@ -540,8 +496,6 @@ export default function HomeScreen() {
                         source={{ uri: attachment.uri }}
                         style={{ height: 28, width: 28, borderRadius: 8 }}
                         contentFit="cover"
-                        // Sin transición el thumbnail parpadea al agregar varias
-                        // fotos seguidas desde la galería.
                         transition={120}
                       />
                     ) : (
@@ -586,9 +540,7 @@ export default function HomeScreen() {
               multiline
             />
 
-            {/* Barra de Acciones */}
             <View className="flex-row items-center justify-between pt-0.5">
-              {/* Izquierda: Agregar (+) y Cámara */}
               <View className="flex-row items-center gap-2">
                 <TouchableOpacity
                   className={`${ACTION_CIRCLE} items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
@@ -610,21 +562,8 @@ export default function HomeScreen() {
                 >
                   <Ionicons name="camera" size={ACTION_ICON_SIZE} color="#FFFFFF" />
                 </TouchableOpacity>
-
-                {/* Atajo directo al teclado matemático: escribir ecuaciones es
-                    lo más frecuente y no debería requerir abrir el menú "+". */}
-                <TouchableOpacity
-                  className={`${ACTION_CIRCLE} items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Abrir teclado matemático"
-                  onPress={() => setMathKeyboardVisible(true)}
-                >
-                  <Ionicons name="calculator-outline" size={ACTION_ICON_SIZE} color={iconOnSurface} />
-                </TouchableOpacity>
               </View>
 
-              {/* Derecha: Micrófono y Hablar */}
               <View className="flex-row items-center gap-2">
                 <TouchableOpacity
                   className={`${ACTION_CIRCLE} items-center justify-center rounded-full border border-card-light-border bg-surface-light dark:border-surface-dark-border dark:bg-surface-dark`}
@@ -636,7 +575,6 @@ export default function HomeScreen() {
                   <Ionicons name="mic-outline" size={ACTION_ICON_SIZE} color={iconOnSurface} />
                 </TouchableOpacity>
 
-                {/* Con contenido escrito o adjunto, "Hablar" cede su lugar a Enviar. */}
                 {canSend ? (
                   <TouchableOpacity
                     className={`${CAMERA_PILL} items-center justify-center rounded-full`}
@@ -666,9 +604,6 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* ========================================== */}
-      {/* MODAL 1: ELIGE LA MATERIA                  */}
-      {/* ========================================== */}
       <Modal
         visible={isSubjectModalVisible}
         transparent
@@ -697,7 +632,6 @@ export default function HomeScreen() {
           >
             {subjectModalMode === 'list' ? (
               <>
-                {/* Header del Modal (altura fija) */}
                 <View className="mb-3.5 flex-row items-center justify-between">
                   <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
                     {isEditMode ? 'Gestionar materias' : 'Elige la materia'}
@@ -715,12 +649,6 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Lista de materias. OJO: aquí va flexShrink, NO flex-1.
-                    El contenedor solo tiene maxHeight (altura automática), y en
-                    iOS un hijo con flex:1 dentro de un padre sin altura definida
-                    colapsa a 0 y la lista desaparece. Con flexShrink la lista
-                    crece con su contenido y solo se encoge si no cabe, dejando
-                    el footer (Editar / Agregar) siempre visible. */}
                 <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
                   <View className="flex-row flex-wrap justify-between py-0.5">
                     {subjects.map((subject) => {
@@ -755,10 +683,8 @@ export default function HomeScreen() {
                             {subject}
                           </Text>
 
-                          {/* Modo Edición: Muestra botón de eliminar */}
                           {isEditMode ? (
                             <TouchableOpacity
-                              // Área táctil mayor sin agrandar el ícono.
                               className="ml-1 p-0.5"
                               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                               accessibilityRole="button"
@@ -783,7 +709,6 @@ export default function HomeScreen() {
                   </View>
                 </ScrollView>
 
-                {/* Acciones inferiores del modal (altura fija, siempre visibles) */}
                 <View className="mt-3.5 flex-row items-center justify-end gap-2.5 pt-1.5">
                   <TouchableOpacity
                     className={`flex-row items-center rounded-[18px] border px-4 py-2 ${
@@ -817,7 +742,6 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
-                {/* Header del sub-formulario: Agregar Materia (misma modal, sin apilar) */}
                 <View className="mb-3.5 flex-row items-center justify-between">
                   <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
                     Nueva Materia
@@ -869,9 +793,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* ========================================== */}
-      {/* MODAL 2: OPCIONES DE AGREGAR (+)           */}
-      {/* ========================================== */}
       <Modal
         visible={isOptionsModalVisible}
         transparent
@@ -890,7 +811,6 @@ export default function HomeScreen() {
             className="rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
             style={{ paddingBottom: sheetPaddingBottom }}
           >
-            {/* Header del Modal */}
             <View className="relative mb-3.5 items-center justify-center">
               <Text className="text-[13px] font-semibold text-text-secondary-light dark:text-text-secondary-dark">
                 Opciones
@@ -903,7 +823,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Acceso Rápido */}
             <View className="my-1.5 flex-row justify-between gap-2">
               <TouchableOpacity
                 className="flex-1 items-center justify-center rounded-[14px] border border-[#E5E7EB] bg-white py-3.5 dark:border-[#2D2838] dark:bg-[#1F1C28]"
@@ -948,7 +867,6 @@ export default function HomeScreen() {
 
             <View className="my-3 h-px bg-[#E5E7EB] dark:bg-[#2A2533]" />
 
-            {/* Cómo quieres que Foxy responda */}
             <Text className="mb-2 text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
               ¿Cómo quieres la respuesta?
             </Text>
@@ -995,48 +913,7 @@ export default function HomeScreen() {
 
             <View className="my-3 h-px bg-[#E5E7EB] dark:bg-[#2A2533]" />
 
-            {/* Opciones Avanzadas */}
             <View className="gap-3.5">
-              <TouchableOpacity
-                className="flex-row items-center py-1"
-                activeOpacity={0.7}
-                onPress={() => {
-                  setOptionsModalVisible(false);
-                  showComingSoon('El lienzo para dibujar');
-                }}
-              >
-                <View className="mr-2.5 w-7 items-center">
-                  <Ionicons name="color-palette-outline" size={20} color={iconOnSurface} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    Dibujar
-                  </Text>
-                  <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                    Dibuja tus ideas
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="flex-row items-center py-1"
-                activeOpacity={0.7}
-                onPress={() => closeOptionsThen(() => setMathKeyboardVisible(true))}
-              >
-                <View className="mr-2.5 w-7 items-center">
-                  <Ionicons name="calculator-outline" size={20} color={iconOnSurface} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    Teclado matemático
-                  </Text>
-                  <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                    Ingresa símbolos y ecuaciones
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-              </TouchableOpacity>
-
               <TouchableOpacity
                 className="flex-row items-center py-1"
                 activeOpacity={0.7}
@@ -1097,81 +974,11 @@ export default function HomeScreen() {
                   thumbColor="#FFFFFF"
                 />
               </View>
-
-              <TouchableOpacity
-                className="flex-row items-center py-1"
-                activeOpacity={0.7}
-                onPress={() => {
-                  setOptionsModalVisible(false);
-                  setMoodModalVisible(true);
-                }}
-              >
-                <View className="mr-2.5 w-7 items-center">
-                  <Ionicons name="happy-outline" size={20} color={iconOnSurface} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    Estado de ánimo de hoy
-                  </Text>
-                  <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                    {mood.emoji} {mood.label}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-              </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* ========================================== */}
-      {/* MODAL 3: ESTADO DE ÁNIMO DE HOY            */}
-      {/* ========================================== */}
-      <Modal
-        visible={isMoodModalVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setMoodModalVisible(false)}
-      >
-        <View className="flex-1 items-center justify-center bg-black/55 px-6 dark:bg-black/80">
-          <View
-            className="w-full rounded-[22px] border border-[#E5E7EB] bg-white p-5 dark:border-[#342F42] dark:bg-[#1C1924]"
-            style={{ elevation: 10 }}
-          >
-            <Text className="mb-3.5 text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-              ¿Cómo te sientes hoy?
-            </Text>
-            <View className="flex-row flex-wrap justify-between gap-2.5">
-              {MOOD_OPTIONS.map((option) => {
-                const isSelected = mood.label === option.label;
-                return (
-                  <TouchableOpacity
-                    key={option.label}
-                    className="w-[30%] items-center justify-center rounded-2xl border-[1.5px] border-[#E5E7EB] bg-white py-3.5 dark:border-[#2D2838] dark:bg-[#1F1C28]"
-                    style={isSelected ? { borderColor: subjectAccent.color, backgroundColor: subjectAccent.soft } : undefined}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setMood(option);
-                      setMoodModalVisible(false);
-                    }}
-                  >
-                    <Text className="mb-1 text-2xl">{option.emoji}</Text>
-                    <Text className="text-[11px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ========================================== */}
-      {/* MODAL 4: COMENZAR                          */}
-      {/* ========================================== */}
       <Modal
         visible={isStartModalVisible}
         transparent
@@ -1205,7 +1012,6 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
-              {/* ESCANEAR PROBLEMA */}
               <TouchableOpacity
                 className="mb-4 flex-row items-center rounded-[20px] border border-card-light-border bg-card-light p-4 dark:border-card-dark-border dark:bg-card-dark"
                 activeOpacity={0.8}
@@ -1230,7 +1036,6 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-forward" size={16} color="#6B7280" />
               </TouchableOpacity>
 
-              {/* CREAR UNA LECCIÓN */}
               <Text className="mb-2.5 text-sm font-bold text-text-primary-light dark:text-text-primary-dark">
                 Crear una lección
               </Text>
@@ -1255,7 +1060,6 @@ export default function HomeScreen() {
                 ))}
               </View>
 
-              {/* PLAN DE ESTUDIO */}
               <TouchableOpacity
                 className="mb-3 flex-row items-center rounded-[20px] border border-card-light-border bg-card-light p-4 dark:border-card-dark-border dark:bg-card-dark"
                 activeOpacity={0.8}
@@ -1280,7 +1084,6 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-forward" size={16} color="#6B7280" />
               </TouchableOpacity>
 
-              {/* CLASE / COMPAÑEROS */}
               <TouchableOpacity
                 className="flex-row items-center rounded-[20px] border border-card-light-border bg-card-light p-4 dark:border-card-dark-border dark:bg-card-dark"
                 activeOpacity={0.8}
@@ -1308,16 +1111,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* ========================================== */}
-      {/* MODAL 5: TECLADO MATEMÁTICO                */}
-      {/* ========================================== */}
-      <MathKeyboard
-        visible={isMathKeyboardVisible}
-        onClose={() => setMathKeyboardVisible(false)}
-        value={inputMessage}
-        onEdit={setInputMessage}
-      />
     </View>
   );
 }

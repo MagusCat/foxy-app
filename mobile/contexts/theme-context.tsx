@@ -24,21 +24,9 @@ function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  /**
-   * NativeWind es la ÚNICA fuente de verdad del tema.
-   *
-   * Su `setColorScheme` llama por dentro a `Appearance.setColorScheme(...)`.
-   * Antes le pasábamos el esquema ya resuelto ('light' | 'dark'), lo que
-   * forzaba el Appearance de todo el sistema: `useColorScheme()` quedaba
-   * clavado en ese valor y la opción "Sistema" dejaba de seguir al SO.
-   *
-   * Ahora le pasamos la PREFERENCIA. Con 'system' NativeWind hace
-   * `Appearance.setColorScheme(null)` y vuelve a seguir al sistema operativo.
-   */
   const { colorScheme: activeScheme, setColorScheme } = useNativeWindColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>('system');
 
-  // Rehidrata la preferencia guardada en el dispositivo.
   useEffect(() => {
     let cancelled = false;
     AsyncStorage.getItem(STORAGE_KEY)
@@ -48,7 +36,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {
-        // Sin preferencia guardada seguimos con 'system'.
       });
     return () => {
       cancelled = true;

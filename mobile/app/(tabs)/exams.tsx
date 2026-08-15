@@ -34,7 +34,6 @@ const EXAM_SUBJECTS = [
 type RecentExam = {
   id: string;
   subject: string;
-  /** ISO: se guarda en disco como JSON, donde Date no sobrevive. */
   createdAt: string;
 };
 
@@ -69,8 +68,6 @@ export default function ExamsScreen() {
     setRecentExams([newExam, ...recentExams]);
     setCreateExamModalVisible(false);
 
-    // Crear un examen es actividad real: cuenta para la racha y aparece en
-    // el historial de "Mi actividad".
     markStudied();
     logSession({
       kind: 'exam',
@@ -118,7 +115,6 @@ export default function ExamsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* BARRA SUPERIOR (HEADER): misma forma y alto que en Preguntar. */}
         <View className="flex-row items-center justify-between pb-4">
           <TouchableOpacity
             className="h-9 flex-row items-center rounded-full border border-card-light-border bg-surface-light px-3 dark:border-surface-dark-border dark:bg-surface-dark"
@@ -150,7 +146,6 @@ export default function ExamsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* HERO: PREPÁRATE PARA TUS EXÁMENES */}
         <View className="items-start rounded-[24px] border border-card-light-border bg-card-light p-5 dark:border-card-dark-border dark:bg-card-dark">
           <View className="mb-3.5 flex-row">
             <View className="h-10 w-10 items-center justify-center rounded-full border-2 border-card-light bg-[#FEE2E2] dark:border-card-dark dark:bg-[#2D1B22]">
@@ -213,7 +208,6 @@ export default function ExamsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* EXÁMENES RECIENTES (si el usuario ya creó alguno) */}
         {recentExams.length > 0 && (
           <View className="mt-[26px]">
             <Text className="mb-3 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -253,7 +247,6 @@ export default function ExamsScreen() {
           </View>
         )}
 
-        {/* MI ESCUELA */}
         <View className="mt-[26px]">
           <Text className="mb-3 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
             Mi escuela
@@ -296,7 +289,6 @@ export default function ExamsScreen() {
           )}
         </View>
 
-        {/* MÁS PREPARACIONES DE EXAMEN */}
         <View className="mt-[26px] mb-6">
           <Text className="mb-3 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
             Más preparaciones de examen
@@ -329,7 +321,6 @@ export default function ExamsScreen() {
         </View>
       </ScrollView>
 
-      {/* MODAL: CREAR MI EXAMEN */}
       <Modal
         visible={isCreateExamModalVisible}
         transparent
@@ -398,7 +389,6 @@ export default function ExamsScreen() {
         </View>
       </Modal>
 
-      {/* MODAL: AGREGAR / EDITAR ESCUELA */}
       <Modal
         visible={isSchoolModalVisible}
         transparent
@@ -409,8 +399,6 @@ export default function ExamsScreen() {
       >
         <View
           className="flex-1 items-center justify-center bg-black/55 px-6 dark:bg-black/80"
-          // El diálogo está centrado y el input abre el teclado con autoFocus:
-          // sin este padding el teclado tapa el campo y el botón Guardar.
           style={{ paddingBottom: keyboardHeight }}
         >
           <View
