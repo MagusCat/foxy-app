@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { GoalBar } from '@/components/goal-bar';
@@ -321,19 +320,13 @@ export default function ExamPlanScreen() {
         </View>
 
         <View className="mt-5 px-5">
-          <LinearGradient
-            colors={
-              left <= 1
-                ? ['#3B1418', isDark ? '#1A0F12' : '#4C1D24']
-                : [softTint(accent.color, true), isDark ? '#16151B' : '#1F1C28']
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <View
             style={{
               borderRadius: 20,
               borderWidth: 1,
               borderColor: left <= 1 ? '#7F1D1D' : colors.cardBorder,
               padding: 18,
+              backgroundColor: left <= 1 ? '#3B1418' : softTint(accent.color, true),
             }}
           >
             <Text className="text-[11px] font-bold uppercase tracking-wider text-white/70">
@@ -354,7 +347,7 @@ export default function ExamPlanScreen() {
                 {formatExamDate(plan.examDate)}
               </Text>
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         <ScrollView

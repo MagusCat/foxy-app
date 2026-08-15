@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useScreenPadding } from '@/components/screen-header';
@@ -107,11 +106,13 @@ export default function ClassroomScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <LinearGradient
-          colors={[accent.color, isDark ? '#16151B' : '#1F1C28']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ paddingTop: padding.top, paddingHorizontal: 20, paddingBottom: 24 }}
+        <View
+          style={{
+            paddingTop: padding.top,
+            paddingHorizontal: 20,
+            paddingBottom: 24,
+            backgroundColor: accent.color,
+          }}
         >
           <View className="flex-row items-center">
             <TouchableOpacity
@@ -166,7 +167,7 @@ export default function ClassroomScreen() {
               </View>
             ) : null}
           </View>
-        </LinearGradient>
+        </View>
 
         <View className="flex-row gap-2 px-5 pt-4">
           {TABS.map((item) => {

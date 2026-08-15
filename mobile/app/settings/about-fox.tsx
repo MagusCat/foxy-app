@@ -1,7 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 
 import { Card, Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
@@ -48,11 +47,13 @@ export default function AboutFoxScreen() {
 
   return (
     <ScreenShell title="¿Qué es Fox?" subtitle="La app, el zorro y para qué sirven">
-      <LinearGradient
-        colors={[Palette.primary, Palette.accentBlue]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ borderRadius: 24, padding: 22, marginTop: 8 }}
+      <View
+        style={{
+          borderRadius: 24,
+          padding: 22,
+          marginTop: 8,
+          backgroundColor: Palette.primary,
+        }}
       >
         <View className="flex-row items-center">
           <View className="h-16 w-16 items-center justify-center rounded-3xl bg-white/20">
@@ -71,7 +72,7 @@ export default function AboutFoxScreen() {
           dentro se llama <Text className="font-bold text-white">Foxy</Text>: es quien lee tus
           apuntes, te explica los ejercicios y te recuerda que hoy toca estudiar.
         </Text>
-      </LinearGradient>
+      </View>
 
       <SectionTitle>Qué puedes hacer</SectionTitle>
       <View className="gap-2.5">

@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
@@ -399,23 +398,10 @@ export default function HomeScreen() {
             className="mt-5 flex-row items-center rounded-[22px] px-[22px] py-3"
             style={{ backgroundColor: Palette.primary }}
           >
-            <LinearGradient
-              colors={[Palette.primary, Palette.accentBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 22,
-                paddingVertical: 12,
-                borderRadius: 22,
-              }}
-            >
-              <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text className="text-sm font-bold text-white" numberOfLines={1}>
-                Comienza aquí
-              </Text>
-            </LinearGradient>
+            <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text className="text-sm font-bold text-white" numberOfLines={1}>
+              Comienza aquí
+            </Text>
           </TouchableOpacity>
 
           <View className="mt-7 w-full gap-2">

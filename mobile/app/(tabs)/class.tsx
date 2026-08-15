@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 import { TabHeader, useScreenPadding } from '@/components/screen-header';
@@ -166,21 +165,19 @@ export default function ClassScreen() {
               accessibilityLabel="Crear salón"
               onPress={openCreateForm}
             >
-              <LinearGradient
-                colors={[Palette.primary, Palette.accentBlue]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+              <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: 20,
+                  backgroundColor: Palette.primary,
                 }}
               >
                 <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
                 <Text className="text-[13px] font-bold text-white">Crear salón</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           }
         />
