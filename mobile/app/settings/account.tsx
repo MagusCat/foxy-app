@@ -65,7 +65,6 @@ export default function AccountScreen() {
 
   return (
     <ScreenShell title="Mi cuenta" subtitle="Tus datos y cómo te ve Foxy">
-      {/* IDENTIDAD */}
       <View
         className="mt-2 flex-row items-center rounded-2xl border p-4"
         style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}

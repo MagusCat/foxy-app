@@ -11,9 +11,7 @@ export type AgendaEvent = {
   id: string;
   title: string;
   subject: string;
-  /** YYYY-MM-DD local. */
   date: string;
-  /** HH:MM opcional. */
   time?: string;
   kind: EventKind;
 };
@@ -41,14 +39,12 @@ export function localDay(date: Date) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-/** Días entre dos fechas YYYY-MM-DD, ignorando la hora. */
 export function daysUntil(day: string, from = new Date()) {
   const target = new Date(`${day}T00:00:00`).getTime();
   const base = new Date(`${localDay(from)}T00:00:00`).getTime();
   return Math.round((target - base) / 86_400_000);
 }
 
-/** "Hoy", "Mañana", "En 3 días" o la fecha larga si está lejos. */
 export function describeEventDate(day: string) {
   const diff = daysUntil(day);
   if (diff === 0) return 'Hoy';
@@ -64,18 +60,12 @@ export function describeEventDate(day: string) {
 export type CalendarCell = {
   key: string;
   day: number;
-  /** Celda de relleno del mes anterior o siguiente. */
   isOutside: boolean;
   isToday: boolean;
 };
 
-/**
- * Rejilla de 6 semanas empezando en lunes. Siempre 42 celdas para que el
- * calendario no cambie de alto al pasar de mes.
- */
 export function buildMonthGrid(year: number, month: number): CalendarCell[] {
   const first = new Date(year, month, 1);
-  // getDay(): 0 = domingo. Queremos 0 = lunes.
   const leading = (first.getDay() + 6) % 7;
   const today = localDay(new Date());
 
@@ -91,12 +81,6 @@ export function buildMonthGrid(year: number, month: number): CalendarCell[] {
   });
 }
 
-/**
- * Agenda de próximos eventos: exámenes, tareas, clases y repasos.
- *
- * Todo se guarda en el dispositivo; cuando exista el backend esto se
- * sincroniza con el calendario de la escuela.
- */
 export function useAgenda() {
   const [events, setEvents, hydrated] = usePersistentState<AgendaEvent[]>(STORAGE_KEY, []);
 
@@ -122,7 +106,6 @@ export function useAgenda() {
   const today = localDay(new Date());
   const upcoming = useMemo(() => sorted.filter((event) => event.date >= today), [sorted, today]);
 
-  /** Días con al menos un evento, para pintar el punto en el calendario. */
   const markedDays = useMemo(() => {
     const map = new Map<string, AgendaEvent[]>();
     sorted.forEach((event) => {

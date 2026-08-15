@@ -42,7 +42,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
   const backgroundColor = isDark ? Palette.cardDark : Palette.cardLight;
   const borderColor = isDark ? Palette.cardDarkBorder : Palette.cardLightBorder;
 
-  // Elevación sobre la barra del sistema (3 botones o gestos) en Android/iOS
   const bottomMargin = Platform.OS === 'android' ? Math.max(insets.bottom, 12) + 8 : insets.bottom + 8;
 
   return (
@@ -99,8 +98,6 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
             <Text
               className="mt-0.5 text-center text-[10px] font-semibold"
               style={{ color }}
-              // La etiqueta es de 10px: sin tope, una fuente grande del
-              // sistema desborda y parte la barra flotante.
               maxFontSizeMultiplier={1.3}
               numberOfLines={1}
             >

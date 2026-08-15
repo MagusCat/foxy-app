@@ -12,16 +12,9 @@ import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 type AvatarEditorProps = {
   name: string;
   size?: number;
-  /** Sin esto solo se muestra la foto, sin botón de cambiar. */
   editable?: boolean;
 };
 
-/**
- * Foto de perfil con su propio selector.
- *
- * Se usa una hoja inferior y no `Alert` porque hacen falta hasta cuatro
- * opciones y el diálogo de Android solo admite tres botones.
- */
 export function AvatarEditor({ name, size = 64, editable = true }: AvatarEditorProps) {
   const { isDark, colors } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
@@ -34,8 +27,6 @@ export function AvatarEditor({ name, size = 64, editable = true }: AvatarEditorP
 
   const choose = async (source: 'camera' | 'library') => {
     setSheetVisible(false);
-    // Esperamos al cierre: en iOS no se puede presentar la cámara mientras
-    // otro modal se está desmontando.
     setTimeout(async () => {
       const uri = await pickSingleImage(source);
       if (uri) setAvatarUri(uri);

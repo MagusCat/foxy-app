@@ -18,7 +18,6 @@ import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
-/** Fondo suave de un ícono a partir de su color, sin tablas de tintes. */
 export function softTint(color: string, isDark: boolean) {
   return `${color}${isDark ? '2E' : '1F'}`;
 }
@@ -29,10 +28,6 @@ type ScreenShellProps = {
   children: React.ReactNode;
 };
 
-/**
- * Marco común de las pantallas apiladas (configuración, suscripción,
- * actividad): botón de volver, título y scroll con los márgenes seguros.
- */
 export function ScreenShell({ title, subtitle, children }: ScreenShellProps) {
   const padding = useScreenPadding();
   const router = useRouter();
@@ -82,10 +77,6 @@ export function ScreenShell({ title, subtitle, children }: ScreenShellProps) {
   );
 }
 
-/**
- * Rótulo de sección. Discreto a propósito: en una pantalla de ajustes lo que
- * tiene que resaltar son las opciones, no los encabezados.
- */
 export function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <Text className="mb-2 mt-6 px-1 text-[11px] font-semibold uppercase tracking-wider text-text-secondary-light dark:text-text-secondary-dark">
@@ -94,7 +85,6 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Tarjeta contenedora: agrupa filas con separadores internos. */
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const { colors } = useTheme();
   return (
@@ -109,21 +99,14 @@ export function Card({ children, className = '' }: { children: React.ReactNode; 
 
 export function CardDivider() {
   const { colors } = useTheme();
-  // 14 (px-3.5) + 32 (ícono) + 12 (mr-3): el separador arranca bajo el texto.
   return <View className="ml-[58px] h-px" style={{ backgroundColor: colors.cardBorder }} />;
 }
 
 type RowProps = {
   icon: keyof typeof Ionicons.glyphMap;
-  /**
-   * Solo para lo que de verdad necesita destacar (el plan, un aviso). Sin
-   * color, el ícono va en gris: una lista de ajustes con siete colores
-   * distintos se vuelve ilegible.
-   */
   color?: string;
   label: string;
   description?: string;
-  /** Texto corto a la derecha, antes del chevron. */
   value?: string;
   badge?: string;
   danger?: boolean;
@@ -257,7 +240,6 @@ type ChipGroupProps<T extends string> = {
   accent?: string;
 };
 
-/** Selector de una opción entre varias, en forma de píldoras. */
 export function ChipGroup<T extends string>({ options, selected, onSelect, accent }: ChipGroupProps<T>) {
   const { isDark, colors } = useTheme();
   const color = accent ?? (isDark ? Palette.primaryGlow : Palette.primary);
@@ -304,13 +286,11 @@ type PromptModalProps = {
   initialValue: string;
   keyboardType?: KeyboardTypeOptions;
   maxLength?: number;
-  /** Permite guardar vacío (por ejemplo, para borrar un dato opcional). */
   allowEmpty?: boolean;
   onCancel: () => void;
   onSave: (value: string) => void;
 };
 
-/** Diálogo de un solo campo, compartido por las pantallas de configuración. */
 export function PromptModal({
   visible,
   title,
@@ -326,8 +306,6 @@ export function PromptModal({
   const keyboardHeight = useKeyboardHeight();
   const [draft, setDraft] = useState(initialValue);
 
-  // El modal se reutiliza para varios campos: hay que resembrar el borrador
-  // cada vez que se abre, o queda el texto del campo anterior.
   useEffect(() => {
     if (visible) setDraft(initialValue);
   }, [visible, initialValue]);
@@ -397,7 +375,6 @@ export function PromptModal({
   );
 }
 
-/** Aviso tranquilo al pie de una sección. */
 export function Note({ icon = 'information-circle-outline', children }: {
   icon?: keyof typeof Ionicons.glyphMap;
   children: React.ReactNode;
