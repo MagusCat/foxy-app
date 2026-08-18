@@ -1,11 +1,11 @@
-# Foxy
+# Fox App
 
 > [!NOTE]
 > Proyecto desarrollado para **Hackathon Nicaragua 2026** dentro de la categoría de **Educación**.
 
 ## Visión del Proyecto
 
-Foxy es una plataforma educativa orientada a transformar la forma en que los estudiantes aprenden y los docentes preparan sus materiales académicos. Mediante el uso de herramientas de **IA Generativa** e **IA Adaptativa**, la aplicación ajusta sus respuestas al perfil de cada usuario, analizando el material de estudio subido y los documentos entregados para ofrecer explicaciones, planes y evaluaciones coherentes.
+Fox es una plataforma educativa orientada a transformar la forma en que los estudiantes aprenden y los docentes preparan sus materiales académicos. Mediante el uso de herramientas de **IA Generativa** e **IA Adaptativa**, la aplicación ajusta sus respuestas al perfil de cada usuario, analizando el material de estudio subido y los documentos entregados para ofrecer explicaciones, planes y evaluaciones coherentes.
 
 ---
 
