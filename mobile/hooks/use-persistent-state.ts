@@ -123,6 +123,7 @@ export const STORAGE_KEYS = [
   'foxy:theme-preference',
   'foxy:session',
   'foxy:onboarding-seen',
+  'foxy:profile-setup-done',
   'foxy:user-name',
   'foxy:avatar',
   'foxy:account',
@@ -138,6 +139,7 @@ export const STORAGE_KEYS = [
   'foxy:events',
   'foxy:questions',
   'foxy:chat',
+  'foxy:conversations',
   'foxy:pending-question',
   'foxy:answer-mode',
   'foxy:plan',
@@ -148,6 +150,7 @@ export const STORAGE_KEYS = [
 ];
 
 export const SESSION_KEYS = [
+  'foxy:profile-setup-done',
   'foxy:user-name',
   'foxy:avatar',
   'foxy:account',
@@ -160,6 +163,7 @@ export const SESSION_KEYS = [
   'foxy:events',
   'foxy:questions',
   'foxy:chat',
+  'foxy:conversations',
   'foxy:usage',
   'foxy:focus-session',
 ];

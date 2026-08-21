@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { Card, CardDivider, Note, Row, ScreenShell, SectionTitle } from '@/components/settings-ui';
 import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
 import { BASIC_DAILY_QUESTIONS } from '@/constants/plans';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 
 const FAQ = [
   {
@@ -28,9 +29,9 @@ const FAQ = [
     answer: `Con el plan gratuito tienes ${BASIC_DAILY_QUESTIONS} preguntas diarias, que se renuevan solas cada día a medianoche.`,
   },
   {
-    question: '¿Necesito permiso para cambiar de plan?',
+    question: '¿Cómo cambio de plan?',
     answer:
-      'Sí. Cualquier cambio de plan lo autoriza un adulto responsable, y nunca se cobra nada sin ese permiso.',
+      'Elige otro plan en la pantalla de planes. Nunca se cobra nada sin que tú lo confirmes.',
   },
   {
     question: '¿Dónde se guarda mi información?',
@@ -68,8 +69,8 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function HelpScreen() {
-  const router = useRouter();
-  const showSoon = (title: string, message: string) => Alert.alert(title, message);
+  const router = useGuardedRouter();
+  const showSoon = (title: string, message: string) => appAlert(title, message);
 
   return (
     <ScreenShell title="Ayuda y soporte" subtitle="Resolvemos tus dudas sobre Fox">

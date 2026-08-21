@@ -22,8 +22,8 @@ const WHAT_IT_DOES: { icon: keyof typeof Ionicons.glyphMap; title: string; text:
   },
   {
     icon: 'people-outline',
-    title: 'Estudia con tu clase',
-    text: 'Crea o únete a un salón para compartir materiales con tus compañeros.',
+    title: 'Comparte en tu cuaderno',
+    text: 'Crea o únete a un cuaderno para compartir materiales con tus compañeros.',
     color: Palette.accentPurple,
   },
   {
@@ -38,7 +38,7 @@ const VALUES: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
   { icon: 'happy-outline', text: 'Contenido apropiado para la edad de cada estudiante' },
   { icon: 'eye-off-outline', text: 'Sin anuncios ni seguimiento publicitario' },
   { icon: 'lock-closed-outline', text: 'Tus datos son tuyos: hoy ni siquiera salen del teléfono' },
-  { icon: 'people-circle-outline', text: 'Las decisiones de dinero siempre pasan por un adulto' },
+  { icon: 'people-circle-outline', text: 'Nunca se cobra nada sin que tú lo confirmes' },
   { icon: 'school-outline', text: 'Foxy te acompaña a entender, no te da la respuesta y ya' },
 ];
 
@@ -113,7 +113,7 @@ export default function AboutFoxScreen() {
                 Foxy
               </Text>
               <Text className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                Mascota y tutor de la app
+                Mascota y guía de la app
               </Text>
             </View>
           </View>

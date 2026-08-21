@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import {
   POST_KIND_META,
+  roomVisibility,
   useClassroom,
+  VISIBILITY_META,
   type ClassPost,
   type ClassPostKind,
 } from '@/hooks/use-classrooms';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 type Tab = 'tablon' | 'trabajo' | 'personas';
 
@@ -43,7 +49,8 @@ function describeMoment(iso: string) {
 export default function ClassroomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const padding = useScreenPadding();
-  const router = useRouter();
+  const keyboardHeight = useKeyboardHeight();
+  const router = useGuardedRouter();
   const { colors, isDark } = useTheme();
 
   const { room, addPost, removePost, hydrated } = useClassroom(id);
@@ -66,14 +73,14 @@ export default function ClassroomScreen() {
       >
         <Ionicons name="people-outline" size={38} color={colors.icon} />
         <Text className="mt-3 text-center text-[15px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-          Este salón ya no existe
+          Este cuaderno ya no existe
         </Text>
         <TouchableOpacity
           className="mt-5 rounded-full px-5 py-2.5"
           style={{ backgroundColor: Palette.primary }}
           onPress={() => router.replace('/(tabs)/class')}
         >
-          <Text className="text-[13px] font-bold text-white">Ver mis salones</Text>
+          <Text className="text-[13px] font-bold text-white">Ver mis cuadernos</Text>
         </TouchableOpacity>
       </View>
     );
@@ -94,7 +101,7 @@ export default function ClassroomScreen() {
   };
 
   const confirmRemove = (post: ClassPost) =>
-    Alert.alert('Eliminar publicación', '¿Quitarla del tablón?', [
+    appAlert('Eliminar publicación', '¿Quitarla del tablón?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: () => removePost(room.id, post.id) },
     ]);
@@ -102,7 +109,7 @@ export default function ClassroomScreen() {
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
       <ScrollView
-        contentContainerStyle={{ paddingBottom: padding.stackBottom }}
+        contentContainerStyle={{ paddingBottom: padding.stackBottom + keyboardHeight }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -133,10 +140,10 @@ export default function ClassroomScreen() {
               style={{ backgroundColor: '#00000040' }}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={`Código del salón ${room.code}`}
+              accessibilityLabel={`Código del cuaderno ${room.code}`}
               onPress={() =>
-                Alert.alert(
-                  'Código del salón',
+                appAlert(
+                  'Código del cuaderno',
                   `${room.code}\n\nCuando conectemos la app, tus compañeros podrán unirse a "${room.name}" con este código.`,
                 )
               }
@@ -154,12 +161,6 @@ export default function ClassroomScreen() {
           ) : null}
 
           <View className="mt-3 flex-row flex-wrap gap-2">
-            {room.teacher ? (
-              <View className="flex-row items-center rounded-full px-3 py-1.5" style={{ backgroundColor: '#00000035' }}>
-                <Ionicons name="person-outline" size={12} color="#FFFFFF" />
-                <Text className="ml-1.5 text-[12px] font-semibold text-white">{room.teacher}</Text>
-              </View>
-            ) : null}
             {room.schedule ? (
               <View className="flex-row items-center rounded-full px-3 py-1.5" style={{ backgroundColor: '#00000035' }}>
                 <Ionicons name="time-outline" size={12} color="#FFFFFF" />
@@ -218,27 +219,23 @@ export default function ClassroomScreen() {
                 </View>
               </View>
 
-              {room.teacher ? (
-                <>
-                  <View className="ml-[68px] h-px" style={{ backgroundColor: colors.cardBorder }} />
-                  <View className="flex-row items-center p-4">
-                    <View
-                      className="h-11 w-11 items-center justify-center rounded-full"
-                      style={{ backgroundColor: colors.surface }}
-                    >
-                      <Ionicons name="school-outline" size={19} color={colors.text} />
-                    </View>
-                    <View className="ml-3 flex-1">
-                      <Text className="text-[15px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-                        {room.teacher}
-                      </Text>
-                      <Text className="mt-0.5 text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
-                        Profesor
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              ) : null}
+              <View className="ml-[68px] h-px" style={{ backgroundColor: colors.cardBorder }} />
+              <View className="flex-row items-center p-4">
+                <View
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  style={{ backgroundColor: colors.surface }}
+                >
+                  <Ionicons name={VISIBILITY_META[roomVisibility(room)].icon} size={19} color={colors.text} />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-[15px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                    {VISIBILITY_META[roomVisibility(room)].label}
+                  </Text>
+                  <Text className="mt-0.5 text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
+                    {VISIBILITY_META[roomVisibility(room)].hint}
+                  </Text>
+                </View>
+              </View>
             </View>
 
             <View
@@ -303,7 +300,7 @@ export default function ClassroomScreen() {
                     minHeight: 90,
                     textAlignVertical: 'top',
                   }}
-                  placeholder="Escribe algo para tu clase…"
+                  placeholder="Escribe algo para tu cuaderno…"
                   placeholderTextColor={colors.icon}
                   value={draft}
                   onChangeText={setDraft}
@@ -342,7 +339,7 @@ export default function ClassroomScreen() {
                 style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel="Comparte algo con tu clase"
+                accessibilityLabel="Comparte algo con tu cuaderno"
                 onPress={() => setComposing(true)}
               >
                 <View
@@ -354,7 +351,7 @@ export default function ClassroomScreen() {
                   </Text>
                 </View>
                 <Text className="ml-3 flex-1 text-[14px] text-text-secondary-light dark:text-text-secondary-dark">
-                  Comparte algo con tu clase
+                  Comparte algo con tu cuaderno
                 </Text>
                 <Ionicons name="create-outline" size={18} color={colors.icon} />
               </TouchableOpacity>
@@ -371,8 +368,8 @@ export default function ClassroomScreen() {
                 </Text>
                 <Text className="mt-1 text-center text-[12px] leading-[18px] text-text-secondary-light dark:text-text-secondary-dark">
                   {tab === 'trabajo'
-                    ? 'Apunta aquí las tareas del salón para no perderlas de vista.'
-                    : 'Escribe el primer anuncio, apunta una tarea o guarda un material de clase.'}
+                    ? 'Apunta aquí las tareas del cuaderno para no perderlas de vista.'
+                    : 'Escribe el primer anuncio, apunta una tarea o guarda un material del cuaderno.'}
                 </Text>
               </View>
             ) : (

@@ -1,19 +1,20 @@
 import React from 'react';
-import { Alert, Linking, Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 
 import { Card, CardDivider, Note, Row, ScreenShell, SectionTitle } from '@/components/settings-ui';
+import { appAlert } from '@/features/shared/components/overlay';
 import { clearPersistedState, STORAGE_KEYS } from '@/hooks/use-persistent-state';
 
 const STORED_HERE = [
   'Tu nombre y tu foto de perfil',
-  'Materias, escuela, grado y salones',
+  'Materias, escuela, grado y cuadernos',
   'Exámenes creados y tu actividad de estudio',
   'Eventos del calendario y tus preferencias',
 ];
 
 export default function PrivacyScreen() {
   const handleResetData = () => {
-    Alert.alert(
+    appAlert(
       'Borrar mis datos',
       'Se eliminarán tus materias, exámenes, actividad, eventos y preferencias guardadas en este dispositivo. No se puede deshacer.',
       [
@@ -23,7 +24,7 @@ export default function PrivacyScreen() {
           style: 'destructive',
           onPress: async () => {
             await clearPersistedState(STORAGE_KEYS);
-            Alert.alert('Datos borrados', 'Tu información en este dispositivo quedó como al inicio.');
+            appAlert('Datos borrados', 'Tu información en este dispositivo quedó como al inicio.');
           },
         },
       ],
@@ -74,7 +75,7 @@ export default function PrivacyScreen() {
           icon="document-outline"
           label="Términos y condiciones"
           onPress={() =>
-            Alert.alert(
+            appAlert(
               'Términos y condiciones',
               'Se publicarán junto con las cuentas en línea. Mientras tanto, Fox no recopila ni comparte ningún dato.',
             )
@@ -89,7 +90,7 @@ export default function PrivacyScreen() {
           label="Exportar mis datos"
           description="Disponible cuando existan las cuentas"
           onPress={() =>
-            Alert.alert(
+            appAlert(
               'Exportar mis datos',
               'Podrás descargar todo tu historial en cuanto conectemos las cuentas en línea.',
             )

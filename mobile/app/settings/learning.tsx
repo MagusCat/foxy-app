@@ -123,6 +123,21 @@ export default function LearningScreen() {
             onSelect={(value) => update('dailyGoal', Number(value))}
           />
         </PrefBlock>
+
+        <CardDivider />
+
+        <PrefBlock title="Dónde se ve la meta" description="Foxy puede mostrarla de distintas formas, o dejar de mostrarla del todo.">
+          <ChipGroup
+            options={[
+              { value: 'lista', label: 'En la lista' },
+              { value: 'arriba', label: 'Siempre arriba' },
+              { value: 'oculta', label: 'Oculta' },
+              { value: 'apagada', label: 'Apagada' },
+            ]}
+            selected={prefs.goalPlacement}
+            onSelect={(value) => update('goalPlacement', value)}
+          />
+        </PrefBlock>
       </Card>
 
       <SectionTitle>Al resolver ejercicios</SectionTitle>

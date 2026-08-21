@@ -30,7 +30,7 @@ export default function AchievementsScreen() {
         examsCreated: stats.examsCreated,
         eventsPlanned: events.length,
         savedQuestions: saved.length,
-        goalsMet: [...stats.minutesByDay.values()].filter((minutes) => minutes >= goal.goal).length,
+        goalsMet: [...stats.focusMinutesByDay.values()].filter((minutes) => minutes >= goal.goal).length,
       }),
     [streak.best, stats, events.length, saved.length, goal.goal],
   );

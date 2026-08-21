@@ -1,11 +1,13 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Palette, Colors } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const TAB_CONFIG: Record<
   string,
@@ -17,14 +19,14 @@ const TAB_CONFIG: Record<
     inactiveIcon: 'chatbubble-outline',
   },
   exams: {
-    title: 'Examenes',
-    activeIcon: 'document-text',
-    inactiveIcon: 'document-text-outline',
+    title: 'Plan',
+    activeIcon: 'clipboard',
+    inactiveIcon: 'clipboard-outline',
   },
   class: {
-    title: 'Clase',
-    activeIcon: 'school',
-    inactiveIcon: 'school-outline',
+    title: 'Cuaderno',
+    activeIcon: 'book',
+    inactiveIcon: 'book-outline',
   },
   profile: {
     title: 'Perfil',
@@ -33,9 +35,67 @@ const TAB_CONFIG: Record<
   },
 };
 
+function TabBarButton({
+  isFocused,
+  iconName,
+  label,
+  color,
+  onPress,
+  accessibilityLabel,
+  testID,
+}: {
+  isFocused: boolean;
+  iconName: keyof typeof Ionicons.glyphMap;
+  label: string;
+  color: string;
+  onPress: () => void;
+  accessibilityLabel?: string;
+  testID?: string;
+}) {
+  // El icono activo sube 2px — Animated.View con `style` normal (no
+  // `className`), envolviendo solo el icono, nunca el TouchableOpacity: eso
+  // rompe las clases de NativeWind en Android (ver advertencia 0.1 del doc).
+  const lift = useSharedValue(isFocused ? 1 : 0);
+
+  useEffect(() => {
+    lift.value = withTiming(isFocused ? 1 : 0, { duration: 180 });
+  }, [isFocused, lift]);
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -2 * lift.value }],
+  }));
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      onPress={onPress}
+      className="h-full flex-1 items-center justify-center"
+      activeOpacity={0.7}
+    >
+      <Animated.View style={iconStyle}>
+        <Ionicons name={iconName} size={20} color={color} />
+      </Animated.View>
+      <Text
+        className="mt-0.5 text-center text-[10px] font-semibold"
+        style={{ color }}
+        maxFontSizeMultiplier={1.3}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const keyboardHeight = useKeyboardHeight();
+
+  if (keyboardHeight > 0) return null;
 
   const activeColor = isDark ? Palette.primaryGlow : Palette.primary;
   const inactiveColor = isDark ? '#8E8A99' : Colors.light.icon;
@@ -84,26 +144,16 @@ function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarPr
         const iconName = isFocused ? tabInfo.activeIcon : tabInfo.inactiveIcon;
 
         return (
-          <TouchableOpacity
+          <TabBarButton
             key={route.key}
-            accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
+            isFocused={isFocused}
+            iconName={iconName}
+            label={tabInfo.title}
+            color={color}
+            onPress={onPress}
             accessibilityLabel={options.tabBarAccessibilityLabel}
             testID={options.tabBarButtonTestID}
-            onPress={onPress}
-            className="h-full flex-1 items-center justify-center"
-            activeOpacity={0.7}
-          >
-            <Ionicons name={iconName} size={20} color={color} />
-            <Text
-              className="mt-0.5 text-center text-[10px] font-semibold"
-              style={{ color }}
-              maxFontSizeMultiplier={1.3}
-              numberOfLines={1}
-            >
-              {tabInfo.title}
-            </Text>
-          </TouchableOpacity>
+          />
         );
       })}
     </View>
@@ -116,10 +166,11 @@ export default function TabLayout() {
       tabBar={(props) => <CustomFloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        animation: 'shift',
       }}>
       <Tabs.Screen name="index" options={{ title: 'Preguntar' }} />
-      <Tabs.Screen name="exams" options={{ title: 'Examenes' }} />
-      <Tabs.Screen name="class" options={{ title: 'Clase' }} />
+      <Tabs.Screen name="exams" options={{ title: 'Plan' }} />
+      <Tabs.Screen name="class" options={{ title: 'Cuaderno' }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
     </Tabs>
   );

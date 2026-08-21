@@ -1,10 +1,11 @@
 import React from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
+import { Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
 import { BASIC_DAILY_QUESTIONS, PLANS, type Plan } from '@/constants/plans';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 import { useSubscription } from '@/hooks/use-subscription';
 
 export default function SubscriptionScreen() {
@@ -17,24 +18,16 @@ export default function SubscriptionScreen() {
   const handleChoosePlan = (plan: Plan) => {
     if (plan.id === planId) return;
 
-    Alert.alert(
+    appAlert(
       `Cambiar a ${plan.name}`,
-      `${plan.price} ${plan.period}.\n\nLos planes se activan con un adulto responsable: nunca te vamos a cobrar sin su permiso.`,
+      `${plan.price} ${plan.period}.\n\nNunca se cobra nada sin que tú lo confirmes.`,
       [
         { text: 'Ahora no', style: 'cancel' },
-        {
-          text: 'Avisar a un adulto',
-          onPress: () =>
-            Alert.alert(
-              'Listo',
-              'Cuando conectemos las cuentas, aquí se enviará el aviso al correo del adulto que registres en Mi cuenta.',
-            ),
-        },
         {
           text: 'Ver en la app',
           onPress: () => {
             setPlanId(plan.id);
-            Alert.alert(
+            appAlert(
               'Modo vista previa',
               `La app se ve con ${plan.name}. No se cobró nada: es solo para revisar cómo queda.`,
             );
@@ -103,8 +96,8 @@ export default function SubscriptionScreen() {
       </View>
 
       <Note icon="shield-checkmark-outline">
-        Fox es una app de estudio para toda la familia: sin anuncios, sin compras dentro del chat y
-        con la autorización de un adulto para cualquier cambio de plan.
+        Fox es una app de estudio para toda la familia: sin anuncios, sin compras dentro del chat.
+        Nunca se cobra nada sin que tú lo confirmes.
       </Note>
 
       <SectionTitle>Todos los planes</SectionTitle>
@@ -212,36 +205,6 @@ export default function SubscriptionScreen() {
           </View>
         );
       })}
-
-      <SectionTitle>Para mamá, papá o tutor</SectionTitle>
-
-      <Card>
-        <View className="p-[18px]">
-          <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
-            Estudiar tranquilos
-          </Text>
-          <Text className="mt-1.5 text-[13px] leading-[19px] text-text-secondary-light dark:text-text-secondary-dark">
-            Fox está pensado para estudiantes, así que las decisiones de dinero siempre pasan por un
-            adulto y el contenido se mantiene apropiado para la edad de cada perfil.
-          </Text>
-
-          <View className="mt-3.5 gap-2.5">
-            {[
-              { icon: 'happy-outline' as const, text: 'Respuestas apropiadas para la edad del estudiante' },
-              { icon: 'time-outline' as const, text: 'Límites de tiempo de uso configurables' },
-              { icon: 'mail-outline' as const, text: 'Resumen semanal del avance al correo del adulto' },
-              { icon: 'card-outline' as const, text: 'Cancela cuando quieras, sin llamadas ni trámites' },
-            ].map((item) => (
-              <View key={item.text} className="flex-row items-center">
-                <Ionicons name={item.icon} size={16} color={colors.icon} style={{ marginRight: 9 }} />
-                <Text className="flex-1 text-[13px] text-text-primary-light dark:text-text-primary-dark">
-                  {item.text}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </Card>
 
       <Note icon="information-circle-outline">
         Con {PLANS[0].name} tienes {BASIC_DAILY_QUESTIONS} preguntas diarias, que se renuevan solas

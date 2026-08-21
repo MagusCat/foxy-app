@@ -1,13 +1,14 @@
 import React from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { Card, Note, ScreenShell, SectionTitle, softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
 import { MONTH_NAMES } from '@/hooks/use-agenda';
 import { MAX_FREEZES, useDailyStreak } from '@/hooks/use-daily-streak';
@@ -31,56 +32,15 @@ function describeMoment(iso: string) {
 }
 
 export default function ActivityScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { isDark, colors } = useTheme();
   const goal = useDailyGoal();
 
   const [, streak] = useDailyStreak();
   const { sessions, stats } = useStudyActivity();
 
-  const accent = isDark ? Palette.primaryGlow : Palette.primary;
-
   return (
     <ScreenShell title="Mi actividad" subtitle="Tu progreso de estudio y lo que viene">
-        <View
-          className="mt-2 flex-row rounded-full p-1"
-          style={{ backgroundColor: colors.surface }}
-        >
-          {([
-            { value: 'actividad' as const, label: 'Actividad', icon: 'stats-chart-outline' as const },
-            { value: 'calendario' as const, label: 'Calendario', icon: 'calendar-outline' as const },
-          ]).map((option) => {
-            const isSelected = option.value === 'actividad';
-            return (
-              <TouchableOpacity
-                key={option.value}
-                className="flex-1 flex-row items-center justify-center rounded-full py-2"
-                style={{ backgroundColor: isSelected ? colors.card : 'transparent' }}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isSelected }}
-                onPress={() => {
-                  if (option.value === 'calendario') router.push('/calendar');
-                }}
-              >
-                <Ionicons
-                  name={option.icon}
-                  size={15}
-                  color={isSelected ? accent : colors.icon}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  className="text-[13px] font-semibold"
-                  style={{ color: isSelected ? colors.text : colors.textSecondary }}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <>
             <View
               className="mt-4 rounded-[22px] border p-[18px]"
               style={{
@@ -111,7 +71,7 @@ export default function ActivityScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`${streak.freezes} congelaciones de racha`}
                   onPress={() =>
-                    Alert.alert(
+                    appAlert(
                       'Congelaciones de racha',
                       `Tienes ${streak.freezes} de ${MAX_FREEZES}. Si un día no estudias, se gasta una automáticamente y tu racha sigue viva. Ganas una nueva cada 7 días seguidos.`,
                     )
@@ -369,7 +329,6 @@ export default function ActivityScreen() {
             <Note icon="lock-closed-outline">
               Tu actividad se guarda solo en este dispositivo mientras no exista la cuenta en línea.
             </Note>
-        </>
     </ScreenShell>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -14,6 +14,7 @@ import {
   isAllowedDocument,
   isOpaqueFileName,
 } from '@/constants/attachments';
+import { appAlert } from '@/features/shared/components/overlay';
 
 export type Attachment = {
   id: string;
@@ -24,43 +25,28 @@ export type Attachment = {
   size?: number;
 };
 
-type PermissionKind = 'camera' | 'library';
-
-const PERMISSION_COPY: Record<PermissionKind, { title: string; message: string }> = {
-  camera: {
-    title: 'Cámara bloqueada',
-    message:
-      'Foxy necesita la cámara para escanear tus apuntes. Actívala en los ajustes del sistema para continuar.',
-  },
-  library: {
-    title: 'Fotos bloqueadas',
-    message:
-      'Foxy necesita acceso a tus fotos para adjuntarlas. Actívalo en los ajustes del sistema para continuar.',
-  },
-};
-
-async function ensurePermission(kind: PermissionKind): Promise<boolean> {
-  const current =
-    kind === 'camera'
-      ? await ImagePicker.getCameraPermissionsAsync()
-      : await ImagePicker.getMediaLibraryPermissionsAsync();
-
+/**
+ * La cámara es el único permiso que se pide: lanzar la galería no necesita
+ * permiso en Android (doc SDK 54). Nunca devuelve `false` en silencio: si no
+ * se puede continuar, el usuario siempre ve por qué, con "Abrir ajustes".
+ */
+async function ensureCameraPermission(): Promise<boolean> {
+  const current = await ImagePicker.getCameraPermissionsAsync();
   if (current.granted) return true;
 
   if (current.canAskAgain) {
-    const requested =
-      kind === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const requested = await ImagePicker.requestCameraPermissionsAsync();
     if (requested.granted) return true;
-    if (requested.canAskAgain) return false;
   }
 
-  const copy = PERMISSION_COPY[kind];
-  Alert.alert(copy.title, copy.message, [
-    { text: 'Ahora no', style: 'cancel' },
-    { text: 'Abrir ajustes', onPress: () => Linking.openSettings() },
-  ]);
+  appAlert(
+    'Cámara bloqueada',
+    'Foxy necesita la cámara para escanear tus apuntes. Actívala en los ajustes del sistema para continuar.',
+    [
+      { text: 'Ahora no', style: 'cancel' },
+      { text: 'Abrir ajustes', onPress: () => Linking.openSettings() },
+    ],
+  );
   return false;
 }
 
@@ -93,7 +79,7 @@ export function useAttachments() {
 
   const warnIfTrimmed = (requested: number, accepted: number) => {
     if (accepted >= requested) return;
-    Alert.alert(
+    appAlert(
       'Adjuntos al límite',
       `Foxy admite ${MAX_ATTACHMENTS} adjuntos por mensaje. Se agregaron ${accepted} de ${requested}.`,
     );
@@ -110,7 +96,7 @@ export function useAttachments() {
   }, []);
 
   const addFromCamera = useCallback(async () => {
-    if (!(await ensurePermission('camera'))) return;
+    if (!(await ensureCameraPermission())) return;
 
     try {
       const result = await ImagePicker.launchCameraAsync({
@@ -125,7 +111,7 @@ export function useAttachments() {
 
       const asset = result.assets?.[0];
       if (!asset?.uri) {
-        Alert.alert('No se guardó la foto', 'La cámara no devolvió ninguna imagen. Inténtalo de nuevo.');
+        appAlert('No se guardó la foto', 'La cámara no devolvió ninguna imagen. Inténtalo de nuevo.');
         return;
       }
 
@@ -142,13 +128,13 @@ export function useAttachments() {
       warnIfTrimmed(1, accepted);
     } catch (error) {
       console.log('Error abriendo la cámara:', error);
-      Alert.alert('No se pudo abrir la cámara', 'Cierra otras apps que la estén usando e inténtalo de nuevo.');
+      appAlert('No se pudo abrir la cámara', 'Cierra otras apps que la estén usando e inténtalo de nuevo.');
     }
   }, [addAttachments]);
 
   const addFromLibrary = useCallback(async () => {
-    if (!(await ensurePermission('library'))) return;
-
+    // La galería no pide permiso: pedirlo y bloquear si se deniega deja el
+    // botón muerto (advertencia 0.4 del doc). Solo la cámara lo necesita.
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -162,7 +148,7 @@ export function useAttachments() {
 
       const assets = (result.assets ?? []).filter((asset) => Boolean(asset.uri));
       if (assets.length === 0) {
-        Alert.alert('Sin imágenes', 'No se pudo leer la selección. Inténtalo de nuevo.');
+        appAlert('Sin imágenes', 'No se pudo leer la selección. Inténtalo de nuevo.');
         return;
       }
 
@@ -183,7 +169,7 @@ export function useAttachments() {
       warnIfTrimmed(assets.length, accepted);
     } catch (error) {
       console.log('Error abriendo la galería:', error);
-      Alert.alert('No se pudieron abrir tus fotos', 'Inténtalo de nuevo.');
+      appAlert('No se pudieron abrir tus fotos', 'Inténtalo de nuevo.');
     }
   }, [addAttachments]);
 
@@ -224,12 +210,12 @@ export function useAttachments() {
       const accepted = addAttachments(valid);
 
       if (rejectedType.length > 0) {
-        Alert.alert(
+        appAlert(
           'Formato no soportado todavía',
           `Por ahora Foxy solo lee ${ALLOWED_DOCUMENTS_LABEL}.\n\nSe omitió: ${rejectedType.join(', ')}`,
         );
       } else if (rejectedSize.length > 0) {
-        Alert.alert(
+        appAlert(
           'Archivo demasiado grande',
           `El límite es ${formatBytes(MAX_FILE_BYTES)} por archivo.\n\nSe omitió: ${rejectedSize.join(', ')}`,
         );
@@ -238,7 +224,7 @@ export function useAttachments() {
       }
     } catch (error) {
       console.log('Error abriendo el selector de archivos:', error);
-      Alert.alert('No se pudo abrir el archivo', 'Inténtalo de nuevo.');
+      appAlert('No se pudo abrir el archivo', 'Inténtalo de nuevo.');
     }
   }, [addAttachments]);
 
@@ -253,28 +239,26 @@ export function useAttachments() {
 }
 
 export async function pickSingleImage(source: 'camera' | 'library'): Promise<string | null> {
-  if (!(await ensurePermission(source === 'camera' ? 'camera' : 'library'))) return null;
+  if (source === 'camera' && !(await ensureCameraPermission())) return null;
 
   try {
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
-      exif: false,
-      ...(Platform.OS === 'android' ? { shape: 'oval' as const } : {}),
-    };
-
+    // Sin `allowsEditing` ni `shape`: el recortador del fabricante rompe en
+    // algunos dispositivos (advertencia 0.3). La confirmación con la foto en
+    // círculo la hace la propia app, dentro de avatar-editor.
     const result =
       source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6, exif: false })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.6,
+            exif: false,
+          });
 
     if (result.canceled) return null;
     return result.assets?.[0]?.uri ?? null;
   } catch (error) {
     console.log('Error eligiendo la foto de perfil:', error);
-    Alert.alert('No se pudo cambiar tu foto', 'Inténtalo de nuevo.');
+    appAlert('No se pudo cambiar tu foto', 'Inténtalo de nuevo.');
     return null;
   }
 }

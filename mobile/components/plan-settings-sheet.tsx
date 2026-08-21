@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { GradeDial } from '@/components/grade-dial';
@@ -7,6 +7,8 @@ import { MonthCalendar } from '@/components/month-calendar';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { formatShortDate, type StudyPlan } from '@/hooks/use-study-plans';
@@ -84,7 +86,7 @@ export function PlanSettingsSheet({
   const back = () => setView(view === 'info' || view === 'config' ? 'info' : 'config');
 
   const handleDelete = () =>
-    Alert.alert('Eliminar preparación de examen', `¿Eliminar "${plan.title}" y todos sus datos?`, [
+    appAlert('Eliminar preparación de examen', `¿Eliminar "${plan.title}" y todos sus datos?`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: onDelete },
     ]);
@@ -101,21 +103,15 @@ export function PlanSettingsSheet({
             : 'Fecha del examen';
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      statusBarTranslucent
-      navigationBarTranslucent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <AppModal visible={visible} onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
         <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
 
-        <View
-          className="max-h-[90%] rounded-t-[26px] px-[18px] pt-[18px]"
-          style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-        >
+        <SheetSlide>
+          <View
+            className="max-h-[90%] rounded-t-[26px] px-[18px] pt-[18px]"
+            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+          >
           <View className="mb-4 flex-row items-center">
             {view === 'info' ? (
               <View className="h-[34px] w-[34px]" />
@@ -384,8 +380,9 @@ export function PlanSettingsSheet({
               </>
             ) : null}
           </ScrollView>
-        </View>
+          </View>
+        </SheetSlide>
       </View>
-    </Modal>
+    </AppModal>
   );
 }

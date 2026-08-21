@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
-  Modal,
   ScrollView,
   Text,
   TextInput,
@@ -9,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { useScreenPadding } from '@/components/screen-header';
 import { TimePickerSheet } from '@/components/time-picker-sheet';
@@ -17,6 +15,8 @@ import { ChipGroup, softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import {
   buildMonthGrid,
   describeEventDate,
@@ -45,7 +45,7 @@ type Filter = 'todo' | 'mios' | 'clase';
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'todo', label: 'Todo' },
   { value: 'mios', label: 'Mis eventos' },
-  { value: 'clase', label: 'Salón de clases' },
+  { value: 'clase', label: 'Clase' },
 ];
 
 type CalendarItem = {
@@ -61,7 +61,7 @@ type CalendarItem = {
 
 export default function CalendarScreen() {
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { colors } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
 
@@ -147,7 +147,7 @@ export default function CalendarScreen() {
   const handleSaveEvent = () => {
     const title = eventTitle.trim();
     if (!title) {
-      Alert.alert('Falta el título', 'Escribe de qué se trata el evento.');
+      appAlert('Falta el título', 'Escribe de qué se trata el evento.');
       return;
     }
 
@@ -167,7 +167,7 @@ export default function CalendarScreen() {
       return;
     }
 
-    Alert.alert(item.title, `${EVENT_KIND_META[item.kind].label} · ${item.subject}`, [
+    appAlert(item.title, `${EVENT_KIND_META[item.kind].label} · ${item.subject}`, [
       { text: 'Cerrar', style: 'cancel' },
       {
         text: 'Eliminar',
@@ -387,21 +387,15 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
 
-      <Modal
-        visible={isEventModalVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setEventModalVisible(false)}
-      >
+      <AppModal visible={isEventModalVisible} onRequestClose={() => setEventModalVisible(false)}>
         <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
           <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setEventModalVisible(false)} />
 
-          <View
-            className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
-            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-          >
+          <SheetSlide>
+            <View
+              className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
+              style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+            >
             <View className="mb-1 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
                 Nuevo evento
@@ -496,9 +490,10 @@ export default function CalendarScreen() {
             >
               <Text className="text-sm font-bold text-white">Guardar evento</Text>
             </TouchableOpacity>
-          </View>
+            </View>
+          </SheetSlide>
         </View>
-      </Modal>
+      </AppModal>
 
       <TimePickerSheet
         visible={isTimeVisible}

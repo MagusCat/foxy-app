@@ -1,44 +1,41 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { GoalBar } from '@/components/goal-bar';
-import { useScreenPadding } from '@/components/screen-header';
+import { AppHeader, useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
+import { normalizeSubject } from '@/constants/subjects';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
-import { useDailyStreak } from '@/hooks/use-daily-streak';
-import { usePersistentState } from '@/hooks/use-persistent-state';
+import { appAlert } from '@/features/shared/components/overlay';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { describeCountdown, planProgress, useStudyPlans } from '@/hooks/use-study-plans';
 
 export default function ExamsScreen() {
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
+  const keyboardHeight = useKeyboardHeight();
   const { colors, isDark } = useTheme();
-
-  const [streakCount] = useDailyStreak();
-  const [userName] = usePersistentState('foxy:user-name', 'Usuario');
-  const [avatarUri] = usePersistentState('foxy:avatar', '');
-  const [school] = usePersistentState('foxy:school', '');
-  const [profile] = usePersistentState('foxy:grade', { grade: '', tutor: '', shift: 'matutino' });
 
   const { plans, removePlan } = useStudyPlans();
   const [query, setQuery] = useState('');
 
   const visiblePlans = useMemo(() => {
-    const clean = query.trim().toLowerCase();
+    // Normalización sin tildes (doc Parte 5.4): nadie escribe acentos en un
+    // buscador. Buscar "quim" debe encontrar "Química".
+    const clean = normalizeSubject(query.trim());
     if (!clean) return plans;
     return plans.filter(
       (plan) =>
-        plan.title.toLowerCase().includes(clean) || plan.subject.toLowerCase().includes(clean),
+        normalizeSubject(plan.title).includes(clean) || normalizeSubject(plan.subject).includes(clean),
     );
   }, [plans, query]);
 
   const handleDelete = (id: string, title: string) => {
-    Alert.alert('Eliminar preparación', `¿Eliminar "${title}" y todo su progreso?`, [
+    appAlert('Eliminar plan', `¿Eliminar "${title}" y todo su progreso?`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: () => removePlan(id) },
     ]);
@@ -46,73 +43,13 @@ export default function ExamsScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
+      <AppHeader />
+
       <ScrollView
         className="px-5"
-        contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.tabBottom }}
+        contentContainerStyle={{ paddingBottom: padding.tabBottom + keyboardHeight }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center pb-5">
-          <View className="flex-1 flex-row">
-            <TouchableOpacity
-              className="h-9 flex-row items-center rounded-full border px-3"
-              style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel={`Racha de ${streakCount} ${streakCount === 1 ? 'día' : 'días'}. Ver mi actividad`}
-              onPress={() => router.push('/activity')}
-            >
-              <Ionicons name="flame" size={17} color={Palette.flameOrange} />
-              <Text className="ml-1 text-[14px] font-bold text-text-primary-light dark:text-text-primary-dark">
-                {streakCount}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Ver los planes de suscripción"
-            onPress={() => router.push('/subscription')}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                height: 36,
-                paddingHorizontal: 18,
-                borderRadius: 18,
-                backgroundColor: Palette.primary,
-              }}
-            >
-              <Text className="text-[14px] font-bold text-white">Comprar</Text>
-              <Ionicons name="sparkles" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-            </View>
-          </TouchableOpacity>
-
-          <View className="flex-1 flex-row justify-end">
-            <TouchableOpacity
-              className="h-9 w-9 items-center justify-center overflow-hidden rounded-full border"
-              style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Ir a mi perfil"
-              onPress={() => router.push('/(tabs)/profile')}
-            >
-              {avatarUri ? (
-                <Image
-                  source={{ uri: avatarUri }}
-                  style={{ height: '100%', width: '100%' }}
-                  contentFit="cover"
-                />
-              ) : (
-                <Text className="text-[15px] font-bold text-text-primary-light dark:text-text-primary-dark">
-                  {userName.charAt(0).toUpperCase()}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
         <View className="flex-row items-center gap-2.5">
           <View
             className="h-11 flex-1 flex-row items-center rounded-full border px-3.5"
@@ -121,7 +58,7 @@ export default function ExamsScreen() {
             <Ionicons name="search" size={16} color={colors.icon} />
             <TextInput
               className="ml-2 flex-1 text-[14px] text-text-primary-light dark:text-text-primary-dark"
-              placeholder="Buscar examen"
+              placeholder="Buscar plan"
               placeholderTextColor={colors.icon}
               value={query}
               onChangeText={setQuery}
@@ -144,12 +81,12 @@ export default function ExamsScreen() {
             style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Crear nuevo examen"
+            accessibilityLabel="Nuevo plan"
             onPress={() => router.push('/exam/new')}
           >
             <Ionicons name="add" size={17} color={colors.text} />
             <Text className="ml-1 text-[14px] font-semibold text-text-primary-light dark:text-text-primary-dark">
-              Nuevo examen
+              Nuevo plan
             </Text>
           </TouchableOpacity>
         </View>
@@ -157,7 +94,7 @@ export default function ExamsScreen() {
         <View className="mt-7">
           <View className="mb-3 flex-row items-center">
             <Text className="text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
-              Mis preparaciones de examen
+              Mis planes de estudio
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.text} style={{ marginLeft: 4 }} />
           </View>
@@ -195,16 +132,16 @@ export default function ExamsScreen() {
                 style={{ backgroundColor: Palette.primary }}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel="Crear nuevo examen"
+                accessibilityLabel="Crear mi primer plan"
                 onPress={() => router.push('/exam/new')}
               >
                 <Ionicons name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text className="text-sm font-bold text-white">Crear nuevo examen</Text>
+                <Text className="text-sm font-bold text-white">Crear mi primer plan</Text>
               </TouchableOpacity>
             </View>
           ) : visiblePlans.length === 0 ? (
             <Text className="py-4 text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
-              Ninguna preparación coincide con “{query.trim()}”.
+              Ningún plan coincide con “{query.trim()}”.
             </Text>
           ) : (
             visiblePlans.map((plan) => {
@@ -264,81 +201,6 @@ export default function ExamsScreen() {
                 </TouchableOpacity>
               );
             })
-          )}
-        </View>
-
-        <View className="mt-7">
-          <Text className="mb-3 text-[19px] font-bold text-text-primary-light dark:text-text-primary-dark">
-            Mi escuela
-          </Text>
-
-          {school ? (
-            <View
-              className="items-center rounded-[24px] border px-5 py-7"
-              style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
-            >
-              <TouchableOpacity
-                className="absolute right-3.5 top-3.5 h-9 w-9 items-center justify-center rounded-full"
-                style={{ backgroundColor: colors.surface }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Editar mi escuela"
-                onPress={() => router.push('/settings/school')}
-              >
-                <Ionicons name="pencil" size={15} color={colors.icon} />
-              </TouchableOpacity>
-
-              <View className="w-full flex-row items-center justify-center">
-                <View className="w-9 items-center">
-                  <Text style={{ fontSize: 24, lineHeight: 30 }}>🌿</Text>
-                </View>
-                <View
-                  className="mx-2 h-14 w-14 items-center justify-center rounded-2xl"
-                  style={{ backgroundColor: colors.surface }}
-                >
-                  <Text style={{ fontSize: 26, lineHeight: 32 }}>🏛️</Text>
-                </View>
-                <View className="w-9 items-center">
-                  <Text style={{ fontSize: 24, lineHeight: 30, transform: [{ scaleX: -1 }] }}>🌿</Text>
-                </View>
-              </View>
-
-              <Text
-                className="mt-3.5 text-center text-[21px] font-bold leading-[28px] text-text-primary-light dark:text-text-primary-dark"
-                numberOfLines={3}
-              >
-                {school}
-              </Text>
-
-              {profile.grade ? (
-                <Text className="mt-1.5 text-center text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
-                  {profile.grade}
-                </Text>
-              ) : null}
-            </View>
-          ) : (
-            <View
-              className="rounded-[20px] border p-[18px]"
-              style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
-            >
-              <Text className="mb-1.5 text-base font-bold text-text-primary-light dark:text-text-primary-dark">
-                ¿A qué escuela vas?
-              </Text>
-              <Text className="mb-3.5 text-xs leading-[18px] text-text-secondary-light dark:text-text-secondary-dark">
-                Personaliza tus exámenes con contenido relacionado a tus profesores y clases.
-              </Text>
-              <TouchableOpacity
-                className="flex-row items-center self-start rounded-2xl px-4 py-[9px]"
-                style={{ backgroundColor: Palette.primary }}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Agregar escuela"
-                onPress={() => router.push('/settings/school')}
-              >
-                <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                <Text className="text-[13px] font-semibold text-white">Agregar escuela</Text>
-              </TouchableOpacity>
-            </View>
           )}
         </View>
       </ScrollView>

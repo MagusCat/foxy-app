@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import { BASIC_DAILY_QUESTIONS, getPlan, type PlanId } from '@/constants/plans';
+import { BASIC_DAILY_QUESTIONS, BASIC_SUBJECT_LIMIT, getPlan, type PlanId } from '@/constants/plans';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 
 type DailyUsage = {
@@ -48,5 +48,6 @@ export function useSubscription() {
     remaining,
     reachedLimit: remaining !== null && remaining <= 0,
     registerQuestion,
+    subjectLimit: isBasic ? BASIC_SUBJECT_LIMIT : null,
   };
 }
