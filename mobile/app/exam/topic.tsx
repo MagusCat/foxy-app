@@ -1,8 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
-  Modal,
   Text,
   TouchableOpacity,
   useWindowDimensions,
@@ -10,7 +8,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 import Svg, { Path } from 'react-native-svg';
 
 import { NextLessonSheet } from '@/components/next-lesson-sheet';
@@ -20,6 +20,8 @@ import { softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { useStudyActivity } from '@/hooks/use-study-activity';
@@ -62,7 +64,7 @@ export default function TopicScreen() {
   const { planId, topicId } = useLocalSearchParams<{ planId: string; topicId: string }>();
   const { width } = useWindowDimensions();
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { colors, isDark } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
 
@@ -136,7 +138,7 @@ export default function TopicScreen() {
           style={{ backgroundColor: Palette.primary }}
           onPress={() => router.replace('/(tabs)/exams')}
         >
-          <Text className="text-[13px] font-bold text-white">Ver mis exámenes</Text>
+          <Text className="text-[13px] font-bold text-white">Ver mis planes</Text>
         </TouchableOpacity>
       </View>
     );
@@ -158,7 +160,7 @@ export default function TopicScreen() {
 
   const handleNodePress = (lesson: PlanLesson, index: number) => {
     if (!isLessonUnlocked(topic, index)) {
-      Alert.alert('Lección bloqueada', 'Termina la lección anterior para abrir esta.');
+      appAlert('Lección bloqueada', 'Termina la lección anterior para abrir esta.');
       return;
     }
     setOpenLesson(lesson);
@@ -218,7 +220,7 @@ export default function TopicScreen() {
             accessibilityRole="button"
             accessibilityLabel="Cómo funciona este tema"
             onPress={() =>
-              Alert.alert(
+              appAlert(
                 topic.title,
                 'Cada burbuja es una lección. Se abren en orden: al terminar una, se desbloquea la siguiente y sube tu dominio del tema.',
               )
@@ -420,20 +422,14 @@ export default function TopicScreen() {
         </View>
       </Animated.ScrollView>
 
-      <Modal
-        visible={openLesson !== null}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setOpenLesson(null)}
-      >
+      <AppModal visible={openLesson !== null} onRequestClose={() => setOpenLesson(null)}>
         <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
           <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setOpenLesson(null)} />
-          <View
-            className="rounded-t-[26px] px-[18px] pt-[18px]"
-            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-          >
+          <SheetSlide>
+            <View
+              className="rounded-t-[26px] px-[18px] pt-[18px]"
+              style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+            >
             {openLesson ? (
               <>
                 <View className="mb-4 flex-row items-center">
@@ -481,9 +477,10 @@ export default function TopicScreen() {
                 </TouchableOpacity>
               </>
             ) : null}
-          </View>
+            </View>
+          </SheetSlide>
         </View>
-      </Modal>
+      </AppModal>
 
       <NextLessonSheet
         visible={isLessonSheetVisible}

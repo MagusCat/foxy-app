@@ -1,129 +1,94 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
-import { TabHeader, useScreenPadding } from '@/components/screen-header';
+import { AppHeader, TabHeader, useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
-import { TimePickerSheet } from '@/components/time-picker-sheet';
 import { getSubjectAccent } from '@/constants/subject-colors';
-import { mergeSubjects } from '@/constants/subjects';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
-import { generateRoomCode, useClassrooms, type Classroom } from '@/hooks/use-classrooms';
-import { usePersistentState } from '@/hooks/use-persistent-state';
-import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
-import { formatTime12 } from '@/lib/time';
+import { appAlert, useOverlay } from '@/features/shared/components/overlay';
+import {
+  roomVisibility,
+  useClassrooms,
+  VISIBILITY_META,
+  type Classroom,
+} from '@/hooks/use-classrooms';
 
 export type { Classroom } from '@/hooks/use-classrooms';
 
-const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+function JoinRoomSheetContent({ close }: { close: () => void }) {
+  const router = useGuardedRouter();
+  const { colors } = useTheme();
+  const { rooms } = useClassrooms();
+  const [code, setCode] = useState('');
 
-const EMPTY_FORM = { name: '', subject: '', teacher: '', days: [] as string[], time: '' };
+  const canJoin = code.trim().length === 6;
 
-function composeSchedule(days: string[], time: string) {
-  if (days.length === 0 && !time) return '';
+  const handleJoin = () => {
+    const found = rooms.find((room) => room.code.toUpperCase() === code.trim().toUpperCase());
+    close();
 
-  const ordered = DAYS.filter((day) => days.includes(day));
-  const label =
-    ordered.length === 0
-      ? ''
-      : ordered.length === 1
-        ? ordered[0]
-        : `${ordered.slice(0, -1).join(', ')} y ${ordered[ordered.length - 1]}`;
+    if (found) {
+      router.push({ pathname: '/class/[id]', params: { id: found.id } });
+      return;
+    }
 
-  if (!time) return label;
-  return label ? `${label} · ${formatTime12(time)}` : formatTime12(time);
+    appAlert(
+      'Código no encontrado',
+      'Todavía no puedo buscar ese código — los códigos de otras personas se resolverán cuando existan las cuentas en línea.',
+    );
+  };
+
+  return (
+    <>
+      <Text className="mb-4 text-center text-[13px] leading-[18px] text-text-secondary-light dark:text-text-secondary-dark">
+        Pide el código de 6 caracteres a quien creó el cuaderno.
+      </Text>
+      <TextInput
+        className="mb-5 rounded-2xl border px-4 py-4 text-center text-[22px] font-bold text-text-primary-light dark:text-text-primary-dark"
+        style={{ backgroundColor: colors.background, borderColor: colors.cardBorder, letterSpacing: 8 }}
+        placeholder="ABCDEF"
+        placeholderTextColor={colors.icon}
+        value={code}
+        onChangeText={(value) => setCode(value.toUpperCase().slice(0, 6))}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        autoFocus
+        maxLength={6}
+        returnKeyType="done"
+        onSubmitEditing={canJoin ? handleJoin : undefined}
+      />
+      <TouchableOpacity
+        className="items-center rounded-2xl bg-primary px-5 py-3.5"
+        style={canJoin ? undefined : { opacity: 0.5 }}
+        disabled={!canJoin}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Unirme"
+        onPress={handleJoin}
+      >
+        <Text className="text-sm font-bold text-white">Unirme</Text>
+      </TouchableOpacity>
+    </>
+  );
 }
 
 export default function ClassScreen() {
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { isDark, colors } = useTheme();
-  const sheetPaddingBottom = useSheetPaddingBottom();
+  const { showSheet } = useOverlay();
 
   const { rooms, setRooms } = useClassrooms();
-  const [savedSubjects] = usePersistentState<string[]>('foxy:subjects', []);
-  const catalog = useMemo(() => mergeSubjects(savedSubjects).slice(0, 18), [savedSubjects]);
 
-  const [isFormVisible, setFormVisible] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [isTimeVisible, setTimeVisible] = useState(false);
-
-  const openCreateForm = () => {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-    setFormVisible(true);
-  };
-
-  const openEditForm = (room: Classroom) => {
-    setEditingId(room.id);
-    setForm({
-      name: room.name,
-      subject: room.subject,
-      teacher: room.teacher,
-      days: DAYS.filter((day) => room.schedule.includes(day)),
-      time: '',
-    });
-    setFormVisible(true);
-  };
-
-  const closeForm = () => {
-    setFormVisible(false);
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-  };
-
-  const toggleDay = (day: string) =>
-    setForm((prev) => ({
-      ...prev,
-      days: prev.days.includes(day) ? prev.days.filter((item) => item !== day) : [...prev.days, day],
-    }));
-
-  const handleSubmit = () => {
-    const name = form.name.trim();
-    if (!name) {
-      Alert.alert('Falta el nombre', 'Ponle un nombre a tu salón para poder guardarlo.');
-      return;
-    }
-
-    const duplicated = rooms.some(
-      (room) => room.id !== editingId && room.name.toLowerCase() === name.toLowerCase(),
-    );
-    if (duplicated) {
-      Alert.alert('Salón duplicado', 'Ya tienes un salón con ese nombre.');
-      return;
-    }
-
-    const details = {
-      name,
-      subject: form.subject.trim(),
-      teacher: form.teacher.trim(),
-      schedule: composeSchedule(form.days, form.time),
-    };
-
-    if (editingId) {
-      setRooms(rooms.map((room) => (room.id === editingId ? { ...room, ...details } : room)));
-    } else {
-      const created: Classroom = {
-        id: `${Date.now()}`,
-        code: generateRoomCode(),
-        posts: [],
-        ...details,
-      };
-      setRooms([created, ...rooms]);
-      closeForm();
-      setTimeout(() => router.push({ pathname: '/class/[id]', params: { id: created.id } }), 260);
-      return;
-    }
-
-    closeForm();
-  };
+  const openJoinSheet = () =>
+    showSheet({ title: 'Unirme a un cuaderno', render: (close) => <JoinRoomSheetContent close={close} /> });
 
   const handleDelete = (room: Classroom) => {
-    Alert.alert(
-      'Eliminar salón',
+    appAlert(
+      'Eliminar cuaderno',
       `¿Seguro que quieres eliminar "${room.name}"? Esta acción no se puede deshacer.`,
       [
         { text: 'Cancelar', style: 'cancel' },
@@ -138,53 +103,53 @@ export default function ClassScreen() {
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
+      <AppHeader />
+
       <ScrollView
         className="px-5"
-        contentContainerStyle={{ paddingTop: padding.top, paddingBottom: padding.tabBottom }}
+        contentContainerStyle={{ paddingBottom: padding.tabBottom }}
         showsVerticalScrollIndicator={false}
       >
         <TabHeader
-          title="Clase"
+          title="Cuaderno"
           subtitle={
             rooms.length > 0
-              ? `${rooms.length} ${rooms.length === 1 ? 'salón' : 'salones'}`
-              : 'Organiza tus materias en salones'
-          }
-          right={
-            <TouchableOpacity
-              activeOpacity={0.85}
-              className="rounded-[20px]"
-              style={{
-                elevation: 6,
-                shadowColor: Palette.primary,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: isDark ? 0.5 : 0.25,
-                shadowRadius: 8,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Crear salón"
-              onPress={openCreateForm}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 20,
-                  backgroundColor: Palette.primary,
-                }}
-              >
-                <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                <Text className="text-[13px] font-bold text-white">Crear salón</Text>
-              </View>
-            </TouchableOpacity>
+              ? `${rooms.length} ${rooms.length === 1 ? 'cuaderno' : 'cuadernos'}`
+              : 'Organiza tus materias en cuadernos'
           }
         />
 
+        <View className="flex-row gap-2.5">
+          <TouchableOpacity
+            className="flex-1 flex-row items-center justify-center rounded-full py-2.5"
+            style={{ backgroundColor: Palette.primary }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Crear cuaderno"
+            onPress={() => router.push('/class/new')}
+          >
+            <Ionicons name="add" size={17} color="#FFFFFF" style={{ marginRight: 5 }} />
+            <Text className="text-[14px] font-bold text-white">Crear cuaderno</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="flex-1 flex-row items-center justify-center rounded-full border py-2.5"
+            style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Unirme a un cuaderno"
+            onPress={openJoinSheet}
+          >
+            <Ionicons name="enter-outline" size={17} color={colors.text} style={{ marginRight: 5 }} />
+            <Text className="text-[14px] font-bold text-text-primary-light dark:text-text-primary-dark">
+              Unirme
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {rooms.length === 0 ? (
           <View
-            className="items-center rounded-[24px] border px-6 py-10"
+            className="mt-5 items-center rounded-[24px] border px-6 py-10"
             style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
           >
             <View
@@ -194,10 +159,10 @@ export default function ClassScreen() {
               <Text className="text-3xl">🦊</Text>
             </View>
             <Text className="mb-2 text-center text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-              Aún no tienes salones
+              Aún no tienes cuadernos
             </Text>
             <Text className="mb-5 text-center text-[13px] leading-[19px] text-text-secondary-light dark:text-text-secondary-dark">
-              Crea un salón para agrupar tus apuntes, tareas y anuncios por materia. Foxy los usará
+              Crea un cuaderno para agrupar tus apuntes, tareas y anuncios por materia. Foxy los usará
               para darte ayuda más precisa.
             </Text>
             <TouchableOpacity
@@ -205,18 +170,18 @@ export default function ClassScreen() {
               style={{ backgroundColor: Palette.primary }}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel="Crear mi primer salón"
-              onPress={openCreateForm}
+              accessibilityLabel="Crear mi primer cuaderno"
+              onPress={() => router.push('/class/new')}
             >
               <Ionicons name="add" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text className="text-[13px] font-semibold text-white">Crear mi primer salón</Text>
+              <Text className="text-[13px] font-semibold text-white">Crear mi primer cuaderno</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <View className="mt-2">
+          <View className="mt-5">
             {rooms.map((room) => {
               const accent = getSubjectAccent(room.subject || room.name, isDark);
-              const meta = [room.subject, room.teacher].filter(Boolean).join(' · ');
+              const visibility = VISIBILITY_META[roomVisibility(room)];
               const pending = (room.posts ?? []).filter((post) => post.kind === 'tarea').length;
 
               return (
@@ -240,12 +205,12 @@ export default function ClassScreen() {
                         >
                           {room.name}
                         </Text>
-                        {meta ? (
+                        {room.subject ? (
                           <Text
                             className="mt-0.5 text-xs text-text-secondary-light dark:text-text-secondary-dark"
                             numberOfLines={1}
                           >
-                            {meta}
+                            {room.subject}
                           </Text>
                         ) : null}
                       </View>
@@ -256,7 +221,7 @@ export default function ClassScreen() {
                           activeOpacity={0.7}
                           accessibilityRole="button"
                           accessibilityLabel={`Editar ${room.name}`}
-                          onPress={() => openEditForm(room)}
+                          onPress={() => router.push({ pathname: '/class/new', params: { id: room.id } })}
                         >
                           <Ionicons name="pencil-outline" size={17} color={colors.text} />
                         </TouchableOpacity>
@@ -272,7 +237,14 @@ export default function ClassScreen() {
                       </View>
                     </View>
 
-                    <View className="mt-3 flex-row items-center">
+                    <View className="mt-3 flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <View className="flex-row items-center">
+                        <Ionicons name={visibility.icon} size={13} color={colors.icon} />
+                        <Text className="ml-1 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                          {visibility.label}
+                        </Text>
+                      </View>
+
                       {room.schedule ? (
                         <View className="flex-row items-center">
                           <Ionicons name="time-outline" size={13} color={colors.icon} />
@@ -284,7 +256,7 @@ export default function ClassScreen() {
 
                       {pending > 0 ? (
                         <View
-                          className="ml-2 rounded-full px-2 py-0.5"
+                          className="rounded-full px-2 py-0.5"
                           style={{ backgroundColor: softTint('#F97316', isDark) }}
                         >
                           <Text className="text-[10px] font-bold" style={{ color: '#F97316' }}>
@@ -317,186 +289,6 @@ export default function ClassScreen() {
           </View>
         )}
       </ScrollView>
-
-      <Modal
-        visible={isFormVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={closeForm}
-      >
-        <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
-          <TouchableOpacity className="flex-1" activeOpacity={1} onPress={closeForm} />
-          <View
-            className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
-            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-          >
-            <View className="mb-3.5 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-                {editingId ? 'Editar salón' : 'Nuevo salón'}
-              </Text>
-              <TouchableOpacity
-                className="h-[30px] w-[30px] items-center justify-center rounded-full"
-                style={{ backgroundColor: colors.surface }}
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar"
-                onPress={closeForm}
-              >
-                <Ionicons name="close" size={18} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={{ flexShrink: 1 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                Nombre del salón *
-              </Text>
-              <TextInput
-                className="mb-4 rounded-[14px] border px-3.5 py-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
-                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
-                placeholder="Ej. Matemáticas 3ºB"
-                placeholderTextColor={colors.icon}
-                value={form.name}
-                onChangeText={(name) => setForm((prev) => ({ ...prev, name }))}
-                autoFocus
-              />
-
-              <Text className="mb-2 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                Materia
-              </Text>
-              <View className="mb-4 flex-row flex-wrap gap-2">
-                {catalog.map((subject) => {
-                  const isSelected = form.subject === subject;
-                  const accent = getSubjectAccent(subject, isDark);
-                  return (
-                    <TouchableOpacity
-                      key={subject}
-                      className="rounded-2xl border-[1.5px] px-3 py-2"
-                      style={{
-                        borderColor: isSelected ? accent.color : colors.cardBorder,
-                        backgroundColor: isSelected ? accent.soft : colors.background,
-                      }}
-                      activeOpacity={0.75}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      onPress={() =>
-                        setForm((prev) => ({ ...prev, subject: isSelected ? '' : subject }))
-                      }
-                    >
-                      <Text
-                        className="text-[13px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
-                        style={isSelected ? { color: accent.color, fontWeight: '700' } : undefined}
-                      >
-                        {subject}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                Profesor
-              </Text>
-              <TextInput
-                className="mb-4 rounded-[14px] border px-3.5 py-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
-                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
-                placeholder="Ej. Prof. Ramírez"
-                placeholderTextColor={colors.icon}
-                value={form.teacher}
-                onChangeText={(teacher) => setForm((prev) => ({ ...prev, teacher }))}
-              />
-
-              <Text className="mb-2 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                Días de clase
-              </Text>
-              <View className="mb-4 flex-row flex-wrap gap-2">
-                {DAYS.map((day) => {
-                  const isOn = form.days.includes(day);
-                  return (
-                    <TouchableOpacity
-                      key={day}
-                      className="h-11 w-11 items-center justify-center rounded-full border-[1.5px]"
-                      style={{
-                        borderColor: isOn ? Palette.primary : colors.cardBorder,
-                        backgroundColor: isOn ? softTint(Palette.primary, isDark) : colors.background,
-                      }}
-                      activeOpacity={0.75}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: isOn }}
-                      accessibilityLabel={day}
-                      onPress={() => toggleDay(day)}
-                    >
-                      <Text
-                        className="text-[12px] font-semibold text-text-secondary-light dark:text-text-secondary-dark"
-                        style={isOn ? { color: Palette.primary } : undefined}
-                      >
-                        {day}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text className="mb-1.5 text-xs font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                Hora
-              </Text>
-              <TouchableOpacity
-                className="mb-5 flex-row items-center rounded-[14px] border px-3.5 py-3"
-                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Elegir la hora de clase"
-                onPress={() => setTimeVisible(true)}
-              >
-                <Ionicons name="time-outline" size={17} color={colors.icon} />
-                <Text
-                  className="ml-2.5 flex-1 text-sm"
-                  style={{ color: form.time ? colors.text : colors.icon }}
-                >
-                  {form.time ? formatTime12(form.time) : 'Sin hora'}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.icon} />
-              </TouchableOpacity>
-            </ScrollView>
-
-            <View className="mt-2 flex-row justify-end gap-2.5">
-              <TouchableOpacity className="rounded-2xl px-4 py-3" onPress={closeForm}>
-                <Text className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="rounded-2xl px-6 py-3"
-                style={{ backgroundColor: Palette.primary }}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityLabel={editingId ? 'Guardar' : 'Crear salón'}
-                onPress={handleSubmit}
-              >
-                <Text className="text-sm font-bold text-white">
-                  {editingId ? 'Guardar' : 'Crear salón'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <TimePickerSheet
-        visible={isTimeVisible}
-        title="Hora de clase"
-        description="Desliza para elegir la hora"
-        value={form.time || '08:00'}
-        onCancel={() => setTimeVisible(false)}
-        onSave={(time) => {
-          setForm((prev) => ({ ...prev, time }));
-          setTimeVisible(false);
-        }}
-      />
     </View>
   );
 }

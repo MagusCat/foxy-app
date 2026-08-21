@@ -1,41 +1,40 @@
 import { useEffect, useState } from 'react';
-import {
-  Keyboard,
-  KeyboardEvent,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-const SHOW_EVENT = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-const HIDE_EVENT = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+import { Dimensions, Keyboard, KeyboardEvent } from 'react-native';
 
 export function useKeyboardHeight() {
   const [height, setHeight] = useState(0);
 
   useEffect(() => {
-    const animate = () => {
-      if (Platform.OS !== 'web') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
+    let isVisible = false;
+
+    const show = (event: KeyboardEvent) => {
+      const { height: reported, screenY } = event.endCoordinates;
+      // En Android edge-to-edge el alto reportado puede quedarse corto (no
+      // incluye la franja del nav bar/gestos) y el contenido queda medio
+      // tapado. Manda el mayor entre lo reportado y lo que el teclado
+      // ocupa de verdad según su posición en pantalla.
+      const computed = Math.max(0, Dimensions.get('window').height - screenY);
+      const next = Math.max(reported > 0 ? reported : 0, computed);
+      if (!isVisible && next <= 0) return;
+      isVisible = true;
+      setHeight((prev) => (prev === next ? prev : next));
     };
 
-    const showSub = Keyboard.addListener(SHOW_EVENT, (event: KeyboardEvent) => {
-      animate();
-      setHeight(event.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(HIDE_EVENT, () => {
-      animate();
+    const hide = () => {
+      if (!isVisible) return;
+      isVisible = false;
       setHeight(0);
-    });
+    };
+
+    const subscriptions = [
+      Keyboard.addListener('keyboardWillShow', show),
+      Keyboard.addListener('keyboardDidShow', show),
+      Keyboard.addListener('keyboardWillHide', hide),
+      Keyboard.addListener('keyboardDidHide', hide),
+    ];
 
     return () => {
-      showSub.remove();
-      hideSub.remove();
+      subscriptions.forEach((subscription) => subscription.remove());
     };
   }, []);
 

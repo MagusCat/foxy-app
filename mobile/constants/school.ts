@@ -18,8 +18,7 @@ export type Shift = (typeof SHIFTS)[number]['value'];
 
 export type SchoolProfile = {
   grade: string;
-  tutor: string;
-  shift: Shift;
+  shift?: Shift;
   stage?: SchoolStage;
   level?: string;
   group?: string;
@@ -27,8 +26,6 @@ export type SchoolProfile = {
 
 export const DEFAULT_SCHOOL_PROFILE: SchoolProfile = {
   grade: '',
-  tutor: '',
-  shift: 'matutino',
 };
 
 export function describeGrade(profile: SchoolProfile) {

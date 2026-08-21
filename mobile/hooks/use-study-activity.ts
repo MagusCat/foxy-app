@@ -7,7 +7,7 @@ const STORAGE_KEY = 'foxy:activity-log';
 
 const MAX_SESSIONS = 200;
 
-export type StudyKind = 'chat' | 'scan' | 'exam' | 'lesson' | 'class';
+export type StudyKind = 'chat' | 'scan' | 'exam' | 'lesson' | 'class' | 'focus';
 
 export type StudySession = {
   id: string;
@@ -27,6 +27,7 @@ export const STUDY_KIND_META: Record<
   exam: { label: 'Examen de práctica', icon: 'document-text-outline', color: '#EF4444' },
   lesson: { label: 'Lección', icon: 'sparkles-outline', color: '#A855F7' },
   class: { label: 'Clase', icon: 'people-outline', color: '#F97316' },
+  focus: { label: 'Sesión de enfoque', icon: 'timer-outline', color: '#F97316' },
 };
 
 const DAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
@@ -82,6 +83,7 @@ export function useStudyActivity() {
 
     const subjectMinutes = new Map<string, { minutes: number; sessions: number }>();
     const minutesByDay = new Map<string, number>();
+    const focusMinutesByDay = new Map<string, number>();
     let totalMinutes = 0;
     let todayMinutes = 0;
     let weekMinutes = 0;
@@ -107,6 +109,16 @@ export function useStudyActivity() {
       });
     });
 
+    // Solo el modo enfoque suma minutos a la meta diaria. Las lecciones y
+    // exámenes quedan en el historial con sus minutos, pero no mueven la
+    // meta (doc Parte 6.2): no reintroducir otros kinds aquí.
+    sessions.forEach((session) => {
+      if (session.kind !== 'focus') return;
+      const key = localDay(new Date(session.at));
+      focusMinutesByDay.set(key, (focusMinutesByDay.get(key) ?? 0) + session.minutes);
+    });
+    const todayFocusMinutes = focusMinutesByDay.get(today) ?? 0;
+
     const maxSubjectMinutes = Math.max(1, ...[...subjectMinutes.values()].map((item) => item.minutes));
     const bySubject: SubjectTotal[] = [...subjectMinutes.entries()]
       .map(([subject, item]) => ({
@@ -121,9 +133,11 @@ export function useStudyActivity() {
       totalSessions: sessions.length,
       totalMinutes,
       todayMinutes,
+      todayFocusMinutes,
       weekMinutes,
       examsCreated,
       minutesByDay,
+      focusMinutesByDay,
       days,
       maxDayMinutes: Math.max(1, ...days.map((day) => day.minutes)),
       bySubject,

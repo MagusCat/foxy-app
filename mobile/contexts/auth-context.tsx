@@ -2,22 +2,21 @@ import React, { createContext, useCallback, useContext, useMemo } from 'react';
 
 import { clearPersistedState, SESSION_KEYS, usePersistentState } from '@/hooks/use-persistent-state';
 
-/** Por dónde entró el usuario. Se guarda para mostrarlo luego en Mi cuenta. */
 export type AuthProvider = 'google' | 'apple' | 'email';
 
 type Session = {
   provider: AuthProvider;
-  /** ISO. Sirve para saber desde cuándo está la sesión en este equipo. */
   startedAt: string;
 };
 
 type AuthContextValue = {
-  /** `false` mientras se lee el almacenamiento: aún no se sabe a dónde ir. */
   isReady: boolean;
   isSignedIn: boolean;
   session: Session | null;
   hasSeenOnboarding: boolean;
   markOnboardingSeen: () => void;
+  hasCompletedSetup: boolean;
+  completeSetup: () => void;
   signIn: (provider: AuthProvider) => void;
   signOut: () => Promise<void>;
 };
@@ -25,13 +24,6 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProviderContext({ children }: { children: React.ReactNode }) {
-  /**
-   * Todavía no hay cuentas en línea. La sesión es local: guardamos por dónde
-   * entró el usuario para que la app arranque en las pestañas la próxima vez.
-   *
-   * TODO(auth): cuando exista el backend, aquí van el token y su refresco;
-   * `signIn` pasará a ser asíncrono y devolverá el error del proveedor.
-   */
   const [session, setSession, sessionHydrated] = usePersistentState<Session | null>(
     'foxy:session',
     null,
@@ -40,10 +32,18 @@ export function AuthProviderContext({ children }: { children: React.ReactNode })
     'foxy:onboarding-seen',
     false,
   );
+  const [hasCompletedSetup, setHasCompletedSetup, setupHydrated] = usePersistentState(
+    'foxy:profile-setup-done',
+    false,
+  );
 
   const markOnboardingSeen = useCallback(() => {
     setHasSeenOnboarding(true);
   }, [setHasSeenOnboarding]);
+
+  const completeSetup = useCallback(() => {
+    setHasCompletedSetup(true);
+  }, [setHasCompletedSetup]);
 
   const signIn = useCallback(
     (provider: AuthProvider) => {
@@ -55,28 +55,31 @@ export function AuthProviderContext({ children }: { children: React.ReactNode })
   );
 
   const signOut = useCallback(async () => {
-    // Sin cuentas en línea, el perfil vive en el dispositivo: al cerrar sesión
-    // se borra, igual que hacía Perfil antes de que existiera esta pantalla.
     await clearPersistedState(SESSION_KEYS);
     setSession(null);
   }, [setSession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      isReady: sessionHydrated && onboardingHydrated,
+      isReady: sessionHydrated && onboardingHydrated && setupHydrated,
       isSignedIn: session !== null,
       session,
       hasSeenOnboarding,
       markOnboardingSeen,
+      hasCompletedSetup,
+      completeSetup,
       signIn,
       signOut,
     }),
     [
       sessionHydrated,
       onboardingHydrated,
+      setupHydrated,
       session,
       hasSeenOnboarding,
       markOnboardingSeen,
+      hasCompletedSetup,
+      completeSetup,
       signIn,
       signOut,
     ],

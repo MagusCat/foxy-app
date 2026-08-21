@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { BrandLogo } from '@/components/brand-logo';
 import { useScreenPadding } from '@/components/screen-header';
@@ -38,7 +38,7 @@ const SLIDES: Slide[] = [
     color: Palette.accentBlue,
     title: 'Lleva tus exámenes al día',
     description:
-      'Guarda fechas, materias y salones en un solo lugar. Nada de enterarte del examen la noche anterior.',
+      'Guarda fechas, materias y cuadernos en un solo lugar. Nada de enterarte del examen la noche anterior.',
   },
   {
     icon: 'flame',
@@ -52,7 +52,7 @@ const SLIDES: Slide[] = [
 export default function OnboardingScreen() {
   const { width, height } = useWindowDimensions();
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { colors, isDark } = useTheme();
   const { markOnboardingSeen } = useAuth();
 

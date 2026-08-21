@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Easing,
-  Modal,
   ScrollView,
   Text,
   TextInput,
@@ -12,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { GradeDial } from '@/components/grade-dial';
 import { MonthCalendar } from '@/components/month-calendar';
@@ -20,12 +18,15 @@ import { useScreenPadding } from '@/components/screen-header';
 import { softTint } from '@/components/settings-ui';
 import { ALLOWED_DOCUMENTS_LABEL } from '@/constants/attachments';
 import { getSubjectAccent } from '@/constants/subject-colors';
-import { mergeSubjects } from '@/constants/subjects';
+import { mergeSubjects, normalizeSubject, searchSubjects } from '@/constants/subjects';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { localDay } from '@/hooks/use-agenda';
 import { describeAttachment, useAttachments } from '@/hooks/use-attachments';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { useStudyActivity } from '@/hooks/use-study-activity';
@@ -236,9 +237,10 @@ function PreparingView({
 
 export default function NewExamScreen() {
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { colors, isDark } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
+  const keyboardHeight = useKeyboardHeight();
 
   const { createPlan } = useStudyPlans();
   const { logSession } = useStudyActivity();
@@ -275,11 +277,10 @@ export default function NewExamScreen() {
 
   const allSubjects = useMemo(() => mergeSubjects(savedSubjects), [savedSubjects]);
 
-  const filteredSubjects = useMemo(() => {
-    const query = subjectQuery.trim().toLowerCase();
-    if (!query) return allSubjects;
-    return allSubjects.filter((item) => item.toLowerCase().includes(query));
-  }, [allSubjects, subjectQuery]);
+  const filteredSubjects = useMemo(
+    () => searchSubjects(allSubjects, subjectQuery),
+    [allSubjects, subjectQuery],
+  );
 
   const materialCount = attachments.attachments.length + pastedTexts.length;
 
@@ -316,7 +317,7 @@ export default function NewExamScreen() {
     const trimmed = newSubject.trim();
     if (!trimmed) return;
 
-    if (!allSubjects.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+    if (!allSubjects.some((item) => normalizeSubject(item) === normalizeSubject(trimmed))) {
       setSavedSubjects((prev) => [...prev, trimmed]);
     }
     setSubject(trimmed);
@@ -445,7 +446,7 @@ export default function NewExamScreen() {
 
       <ScrollView
         className="px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 24 + keyboardHeight }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!isDialActive}
@@ -923,7 +924,7 @@ export default function NewExamScreen() {
               accessibilityRole="button"
               accessibilityLabel="Chatear para armar tu plan de estudio. Disponible con el plan de pago"
               onPress={() =>
-                Alert.alert(
+                appAlert(
                   'Disponible con el plan de pago',
                   'Armar el plan chateando con Foxy, sin subir material, llegará con la suscripción. Por ahora sube tus apuntes o pega el temario.',
                   [
@@ -1036,20 +1037,14 @@ export default function NewExamScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal
-        visible={isPasteVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setPasteVisible(false)}
-      >
+      <AppModal visible={isPasteVisible} onRequestClose={() => setPasteVisible(false)}>
         <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
           <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setPasteVisible(false)} />
-          <View
-            className="rounded-t-[26px] px-[18px] pt-[18px]"
-            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-          >
+          <SheetSlide>
+            <View
+              className="rounded-t-[26px] px-[18px] pt-[18px]"
+              style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+            >
             <View className="mb-3.5 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
                 Pegar texto
@@ -1093,9 +1088,10 @@ export default function NewExamScreen() {
             >
               <Text className="text-sm font-bold text-white">Añadir texto</Text>
             </TouchableOpacity>
-          </View>
+            </View>
+          </SheetSlide>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

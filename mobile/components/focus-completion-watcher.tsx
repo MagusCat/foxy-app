@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { appAlert } from '@/features/shared/components/overlay';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useFocusSession } from '@/hooks/use-focus-session';
 import { usePersistentState } from '@/hooks/use-persistent-state';
@@ -21,14 +21,14 @@ export function FocusCompletionWatcher() {
     clearFinished();
     markStudied();
     logSession({
-      kind: 'lesson',
+      kind: 'focus',
       subject: selectedSubject,
       title: `Sesión de enfoque de ${finished} min`,
       minutes: finished,
     });
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    Alert.alert(
+    appAlert(
       '¡Sesión completada! 🎉',
       `${finished} minutos de ${selectedSubject} sumados a tu actividad de hoy.`,
     );

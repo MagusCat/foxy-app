@@ -1,7 +1,6 @@
 # Fox 🦊 — app Android
 
-**Aplicación móvil para Android.** Teléfono en vertical, y nada más: no es una
-app de escritorio, ni una web, ni está pensada para tablet. Cada decisión de
+**Aplicación móvil para Android.** Teléfono en vertical, Cada decisión de
 interfaz —el alto de los objetivos táctiles, las hojas que suben desde abajo,
 el hueco que deja el teclado, la barra de pestañas flotante— está tomada para
 una mano sobre un teléfono Android.
@@ -42,22 +41,21 @@ npm install
 ```
 
 ```bash
-npm start
+npx expo start
 ```
 
 Escanea el QR con Expo Go en el teléfono, o pulsa `a` para abrir un emulador
 Android. Para compilar el paquete nativo:
 
 ```bash
-npm run android
+npx expo start --android
 ```
 
 Otros comandos:
 
 | Comando | Para qué |
 | --- | --- |
-| `npm run web` | Levanta la app en el navegador, solo para inspeccionar layout |
-| `npm run lint` | ESLint con la configuración de Expo |
+| `npx expo start --web` | Levanta la app en el navegador, solo para inspeccionar layout |
 | `npx tsc --noEmit` | Comprueba tipos sin generar nada |
 | `npx expo export --platform android` | Empaqueta todo el grafo; detecta imports rotos antes de probar en el teléfono |
 
@@ -87,20 +85,28 @@ adb exec-out screencap -p > captura.png
 ```
 app/                      pantallas, enrutadas por archivo (expo-router)
   _layout.tsx             Stack raíz, proveedores y AuthGate
-  (auth)/                 splash · onboarding · login
-  (tabs)/                 Preguntar · Exámenes · Clase · Perfil
+  (auth)/                 splash · onboarding · login · setup (primer inicio)
+  (tabs)/                 Preguntar · Plan · Cuaderno · Perfil
+  chat.tsx                conversaciones: lista por materia e hilo en una ruta
   exam/new.tsx            asistente de creación de preparación
   exam/[id].tsx           preparación: temas, progreso y archivos
   exam/topic.tsx          árbol de lecciones de un tema
-  class/[id].tsx          salón por dentro
+  class/new.tsx           alta y edición de cuaderno (4 pasos)
+  class/[id].tsx          cuaderno por dentro
   calendar.tsx            calendario propio con eventos y exámenes
   activity.tsx            racha, minutos e historial
   focus.tsx               temporizador de estudio
   history.tsx             preguntas guardadas
   achievements.tsx        logros
-  subscription.tsx        planes
-  settings/               cuenta · escuela · aprendizaje · notificaciones · privacidad · ayuda
+  subscription.tsx        planes de suscripción
+  settings/               cuenta · aprendizaje · notificaciones · privacidad · ayuda · sobre Fox
 components/               interfaz reutilizable
+features/
+  chat/components/        composer compartido (portada e hilo) y burbuja
+  chat/hooks/             modelo de conversaciones agrupadas por materia
+  chat/screens/           pantalla de chat (lista e hilo)
+  shared/components/      portal (AppModal, SheetSlide) y overlay (hojas y diálogos)
+  shared/hooks/           useGuardedRouter y useSubjectLimit
 hooks/                    estado persistido y lógica de dominio
 constants/                paleta, catálogos y tablas fijas
 contexts/                 tema y sesión
@@ -109,10 +115,15 @@ lib/                      utilidades sin React
 
 ## Navegación
 
-El Stack raíz vive en `app/_layout.tsx`. `AuthGate` mira `isSignedIn` del
-contexto de sesión y redirige: sin sesión va a `(auth)/splash`, con sesión a
-`(tabs)`. El splash nativo se mantiene hasta que se resuelve esa decisión, para
-que no se vea un parpadeo de pestañas.
+El Stack raíz vive en `app/_layout.tsx`. `AuthGate` mira la sesión del contexto
+y redirige: sin sesión va a `(auth)/splash`, con sesión pero sin el primer
+inicio completado va a `(auth)/setup`, y con todo listo a `(tabs)`. El splash
+nativo se mantiene hasta que se resuelve esa decisión, para que no se vea un
+parpadeo de pestañas.
+
+Las transiciones por defecto son `slide_from_right` (260 ms). Las pestañas, el
+chat y el arranque entran en fundido; los asistentes de examen y cuaderno y la
+pantalla de planes suben desde abajo.
 
 Todas las pantallas apiladas traen su propio encabezado, así que el del
 navegador está oculto en el Stack (`headerShown: false`).
@@ -123,23 +134,29 @@ apunten una sola vez por muchas pantallas que tengan el temporizador abierto.
 
 ## Las cuatro pestañas
 
-### Preguntar (`app/(tabs)/index.tsx`)
+### Preguntar (`app/(tabs)/index.tsx`) y chat (`app/chat.tsx`)
 
-Es un chat. La pantalla tiene dos estados: portada, cuando el hilo está vacío
-(saludo, botón *Comenzar* y accesos a la meta del día y al próximo evento), e
-hilo de conversación en cuanto hay un mensaje.
+La portada saluda por nombre y muestra la meta del día, el próximo evento y el
+panel de entrada (`ChatComposer`, compartido con el hilo): texto, cámara,
+galería y archivos, con la materia y el modo de respuesta debajo del campo. Un
+botón abre «¿Qué quieres hacer?» con atajos a escanear un problema, crear un
+plan o ir al cuaderno. La portada nunca muestra un hilo: la conversación vive
+en `/chat`.
 
-El panel de entrada está anclado abajo, fuera del scroll, y admite texto,
-cámara, galería y archivos. Debajo del campo se elige la
-materia y el modo de respuesta. Enviar registra la pregunta en el historial,
-suma a la racha y arranca el temporizador de enfoque si no había ninguno
-corriendo.
+Dentro de un tema la materia queda fija —la píldora lo señala con un candado—;
+si se elige otra, se abre conversación nueva. En la lista, las conversaciones
+se agrupan por materia. El menú «+» del composer lleva al modo enfoque y al
+historial.
 
-### Exámenes (`app/(tabs)/exams.tsx`)
+Enviar registra la pregunta en el historial y suma a la racha. El temporizador
+de enfoque nunca arranca solo: el tiempo de estudio se registra desde el modo
+enfoque.
 
-Lista las preparaciones con su barra de dominio y la marca de la calificación
-objetivo, más la tarjeta de la escuela. Desde aquí se crea una preparación
-nueva y se busca entre las existentes.
+### Plan (`app/(tabs)/exams.tsx`)
+
+Lista los planes de estudio con su barra de dominio y la marca de la
+calificación objetivo. Arriba van el buscador —que ignora tildes: «quim»
+encuentra «Química»— y el botón de nuevo plan.
 
 El asistente (`exam/new.tsx`) son cinco pasos —materia, fecha, calificación
 objetivo, material, idioma— seguidos de una pantalla de preparación, una
@@ -160,17 +177,22 @@ marcado, cuenta atrás y tres pestañas.
 separadores por nivel. Las lecciones se abren en orden y cada una completada
 mueve el porcentaje de dominio del tema y del plan.
 
-### Clase (`app/(tabs)/class.tsx`)
+### Cuaderno (`app/(tabs)/class.tsx`)
 
-Salones con nombre, materia, profesor, días y hora. Cada salón tiene un código
-de seis caracteres para invitar. Al entrar (`class/[id].tsx`) hay un banner con
-el color de la materia y tres pestañas: **Novedades** (tablón con anuncios,
-tareas y material), **Trabajo** (solo las tareas) y **Personas**.
+Cuadernos con nombre —lo único obligatorio—, materia opcional, días y
+visibilidad (privado por defecto). «Crear cuaderno» abre el asistente de cuatro
+pasos (`class/new.tsx`: nombre, materia, días, público o privado) y «Unirme»
+pide el código de seis caracteres de un cuaderno ajeno. Al entrar
+(`class/[id].tsx`) hay tres pestañas: **Novedades** (tablón con anuncios,
+tareas y material), **Trabajo** (solo las tareas) y **Personas**, donde se ve
+la visibilidad del cuaderno.
 
 ### Perfil (`app/(tabs)/profile.tsx`)
 
-Avatar y nombre, plan, racha de la semana, tres métricas rápidas y la entrada a
-todos los ajustes.
+Avatar, nombre y escuela, plan, tarjeta de progreso (racha de la semana y
+métricas), botón propio para el calendario y la entrada a todos los ajustes.
+Cerrar sesión borra el perfil y sus datos del dispositivo; las preferencias de
+la app se quedan.
 
 ## Estado y persistencia
 
@@ -195,13 +217,15 @@ un «no existe» mientras aún se está leyendo.
 | `foxy:theme-preference` | `system` · `light` · `dark` |
 | `foxy:session` | proveedor y fecha de inicio de sesión |
 | `foxy:onboarding-seen` | si ya se vio la introducción |
+| `foxy:profile-setup-done` | si ya se completó el primer inicio (setup) |
 | `foxy:user-name`, `foxy:avatar` | perfil |
-| `foxy:account` | correo del adulto y rango de edad |
+| `foxy:account` | rango de edad |
 | `foxy:subjects`, `foxy:selected-subject` | materias activas y la elegida |
-| `foxy:school`, `foxy:grade` | escuela, etapa, grado, grupo, tutor y turno |
+| `foxy:school`, `foxy:grade` | escuela, etapa, nivel, grupo y turno |
 | `foxy:study-plans` | preparaciones de examen completas |
-| `foxy:classrooms` | salones y sus publicaciones |
-| `foxy:chat` | hilo de conversación |
+| `foxy:classrooms` | cuadernos y sus publicaciones |
+| `foxy:conversations` | conversaciones agrupadas por materia |
+| `foxy:chat` | formato viejo del chat: solo sirve para migrar y queda vacío |
 | `foxy:questions`, `foxy:pending-question` | historial y pregunta reenviada |
 | `foxy:answer-mode` | forma de respuesta preferida |
 | `foxy:activity-log` | sesiones de estudio |
@@ -226,12 +250,18 @@ Derivados: `planProgress`, `topicProgress`, `isTopicUnlocked`,
 El número de temas depende de los días que falten para el examen, y la meta
 diaria reparte lo que queda entre esos días con un tope de 12.
 
-**`Classroom`** (`hooks/use-classrooms.ts`) — datos del salón más `posts`, donde
-cada `ClassPost` es un `anuncio`, una `tarea` o un `material`.
+**`Classroom`** (`hooks/use-classrooms.ts`) — nombre, materia opcional, días,
+visibilidad (`privado` por defecto vía `roomVisibility()`) y código de seis
+caracteres, más `posts`, donde cada `ClassPost` es un `anuncio`, una `tarea` o
+un `material`.
 
-**`ChatMessage`** (`hooks/use-chat.ts`) — `role` (`user` · `foxy`), texto,
-materia, fecha y adjuntos. `send` añade el mensaje del usuario; `answer` compone
-la respuesta de Foxy rotando entre las redacciones de `REPLIES`.
+**`Conversation` / `ChatMessage`** (`features/chat/hooks/use-chat.ts`) — cada
+conversación pertenece a una materia y guarda sus mensajes: `role` (`user` ·
+`foxy`), texto, fecha y adjuntos. `send` crea conversación nueva si la materia
+cambia; `answer` compone la respuesta de Foxy rotando redacciones; `groups`
+expone la lista agrupada por materia y ordenada por actividad. Al hidratar, el
+formato viejo (`foxy:chat`, un array plano) se migra solo a conversaciones por
+materia.
 
 **`FocusSession`** (`hooks/use-focus-session.ts`) — `minutes`, `endsAt`,
 `remaining` y `finished`. El reloj se calcula siempre desde `endsAt`, nunca
@@ -266,7 +296,7 @@ que hace que una materia se vea siempre del mismo color en toda la app.
 | Componente | Para qué |
 | --- | --- |
 | `settings-ui.tsx` | `ScreenShell`, `Card`, `Row`, `SwitchRow`, `ChipGroup`, `SectionTitle`, `Note`, `PromptModal`, `softTint` |
-| `screen-header.tsx` | `TabHeader` y `useScreenPadding` (arriba, sobre la barra de pestañas, sobre el borde inferior) |
+| `screen-header.tsx` | `AppHeader` (racha · meta o temporizador · plan), `TabHeader` y `useScreenPadding` |
 | `grade-dial.tsx` | dial circular 50–100 con arrastre y botones ± |
 | `progress-ring.tsx` | anillo de progreso de un solo trazo |
 | `goal-bar.tsx` | barra de dominio con la marca de la calificación objetivo |
@@ -276,20 +306,33 @@ que hace que una materia se vea siempre del mismo color en toda la app.
 | `next-lesson-sheet.tsx` | formatos de lección (Aprender · Practicar · Examen) |
 | `plan-settings-sheet.tsx` | información y ajustes de una preparación |
 | `avatar-editor.tsx` | foto de perfil con cámara, galería y quitar |
-| `chat-bubble.tsx` | mensaje del hilo con adjuntos y hora |
+| `portal.tsx`* | `PortalHost`, `AppModal` (sustituto de `Modal`) y `SheetSlide` |
+| `overlay.tsx`* | `showDialog`, `showSheet`, `showPrompt`, `appAlert`, `reportToUser` |
+| `chat-composer.tsx`* | panel de entrada compartido: materia, adjuntos, opciones |
+| `chat-bubble.tsx`* | mensaje del hilo con adjuntos y hora |
 
-### Hojas y teclado
+\* Viven en `features/shared/components` y `features/chat/components`.
 
-Las hojas inferiores usan `Modal` con `transparent`, `statusBarTranslucent` y
-`navigationBarTranslucent`, y toman su hueco de abajo de
-`useSheetPaddingBottom()`. Ese hook resuelve el detalle que más problemas da en
-Android: la ventana no se reajusta con el teclado y el alto que informa el
-evento deja fuera la barra de navegación, así que hay que sumar
-`insets.bottom`. Cualquier barra anclada al borde inferior debe usarlo.
+### Hojas, diálogos y teclado
 
-Para abrir algo justo después de cerrar una hoja hay que esperar a que termine
-la animación (unos 260 ms). En iOS no se puede presentar un modal mientras otro
-se cierra, y en Android el selector nativo queda detrás.
+Nada usa el `Modal` nativo ni `Alert.alert`. Las hojas inferiores van por
+`AppModal` (`features/shared/components/portal.tsx`), que se superpone dentro
+del mismo árbol de React: en Android, la ventana de sistema aparte dejaba los
+avisos propios detrás y hacía perder el resultado del selector de fotos. El
+fondo entra en fundido y el panel sube deslizando (`SheetSlide`, 260 ms); no
+hay animación de salida. Los diálogos centrados y las hojas compartidas viven
+en `features/shared/components/overlay.tsx`.
+
+Con el teclado ocurre lo descrito arriba: la ventana no se reajusta y el alto
+que informa Android deja fuera la barra de navegación. `useKeyboardHeight()`
+toma el mayor entre el alto reportado y el que se deduce de la posición del
+teclado en pantalla; `useSheetPaddingBottom()` suma además `insets.bottom`.
+Las barras fijas de los asistentes y las pantallas con input suman ese alto a
+su padding.
+
+Para abrir algo justo después de cerrar una hoja conviene esperar a que
+termine el ciclo (~260 ms): el selector nativo puede quedar detrás de la
+ventana que se está cerrando.
 
 ## Utilidades
 
@@ -303,8 +346,10 @@ usa.
 que se muestra: `parseTime`, `toTimeString`, `formatTime12`, y las opciones de
 las ruedas.
 
-`constants/subjects.ts` — catálogo de 40 materias y `mergeSubjects`, que lo une
-con las del usuario sin repetir.
+`constants/subjects.ts` — catálogo base de materias (`DEFAULT_SUBJECTS`) y tres
+ayudantes: `normalizeSubject` (compara sin tildes), `searchSubjects` (filtro
+tolerante para buscadores) y `mergeSubjects`, que une catálogo y materias del
+usuario sin repetir tras normalizar.
 
 `constants/school.ts` — etapas (primaria, secundaria, universidad) con sus
 niveles y sustantivo, grupos, turnos y `describeGrade`.
@@ -320,6 +365,10 @@ de Android devuelve como identificadores.
 - Interfaz en español, incluidas las etiquetas de accesibilidad.
 - Todo control interactivo lleva `accessibilityRole` y `accessibilityLabel`; los
   que tienen estado añaden `accessibilityState`.
+- La navegación por toque pasa por `useGuardedRouter` (enfriamiento contra el
+  doble toque). `useRouter` directo solo vive en el splash y en el `AuthGate`.
+- Sin `Modal` ni `Alert.alert` nativos: las hojas van por `AppModal` +
+  `SheetSlide` y los avisos por `appAlert`.
 - Nada de valores de color sueltos en las pantallas: salen de `Palette`,
   `colors` o `getSubjectAccent`.
 - La entrada de datos se elige de una lista siempre que el dominio sea cerrado

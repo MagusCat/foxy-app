@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { GoalBar } from '@/components/goal-bar';
 import { MonthCalendar } from '@/components/month-calendar';
@@ -14,6 +16,8 @@ import { softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { daysUntil, localDay } from '@/hooks/use-agenda';
 import { useAttachments } from '@/hooks/use-attachments';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
@@ -164,7 +168,7 @@ function StatRow({
 export default function ExamPlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { colors, isDark } = useTheme();
   const sheetPaddingBottom = useSheetPaddingBottom();
 
@@ -216,7 +220,7 @@ export default function ExamPlanScreen() {
           style={{ backgroundColor: Palette.primary }}
           onPress={() => router.replace('/(tabs)/exams')}
         >
-          <Text className="text-[13px] font-bold text-white">Ver mis exámenes</Text>
+          <Text className="text-[13px] font-bold text-white">Ver mis planes</Text>
         </TouchableOpacity>
       </View>
     );
@@ -230,7 +234,7 @@ export default function ExamPlanScreen() {
 
   const openTopic = (topicId: string, unlocked: boolean, title: string) => {
     if (!unlocked) {
-      Alert.alert('Tema bloqueado', `Termina el tema anterior para abrir "${title}".`);
+      appAlert('Tema bloqueado', `Termina el tema anterior para abrir "${title}".`);
       return;
     }
     router.push({ pathname: '/exam/topic', params: { planId: plan.id, topicId } });
@@ -289,7 +293,7 @@ export default function ExamPlanScreen() {
               accessibilityRole="button"
               accessibilityLabel="Compartir"
               onPress={() =>
-                Alert.alert('Próximamente', 'Compartir tu plan con tus compañeros llegará pronto.')
+                appAlert('Próximamente', 'Compartir tu plan con tus compañeros llegará pronto.')
               }
             >
               <Ionicons name="share-social-outline" size={17} color={colors.text} />
@@ -566,7 +570,7 @@ export default function ExamPlanScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Descargar todo"
                 onPress={() =>
-                  Alert.alert(
+                  appAlert(
                     'Tus archivos',
                     plan.materials.length === 0
                       ? 'Todavía no has subido material a esta preparación.'
@@ -649,7 +653,7 @@ export default function ExamPlanScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Abrir ${material.name}`}
                     onPress={() =>
-                      Alert.alert(
+                      appAlert(
                         material.name,
                         material.kind === 'text'
                           ? material.content?.slice(0, 400) || 'Sin contenido'
@@ -666,20 +670,14 @@ export default function ExamPlanScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal
-        visible={isAddVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setAddVisible(false)}
-      >
+      <AppModal visible={isAddVisible} onRequestClose={() => setAddVisible(false)}>
         <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
           <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setAddVisible(false)} />
-          <View
-            className="rounded-t-[26px] px-[18px] pt-[18px]"
-            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-          >
+          <SheetSlide>
+            <View
+              className="rounded-t-[26px] px-[18px] pt-[18px]"
+              style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+            >
             <Text className="mb-4 text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
               Agregar material
             </Text>
@@ -706,9 +704,10 @@ export default function ExamPlanScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+            </View>
+          </SheetSlide>
         </View>
-      </Modal>
+      </AppModal>
 
       <NextLessonSheet
         visible={isLessonSheetVisible}

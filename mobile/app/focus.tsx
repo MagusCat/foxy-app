@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -8,6 +8,8 @@ import { WheelHighlight, WheelPicker } from '@/components/wheel-picker';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { formatClock, useFocusSession } from '@/hooks/use-focus-session';
 import { useDailyGoal } from '@/hooks/use-learning-prefs';
@@ -47,7 +49,7 @@ export default function FocusScreen() {
 
       markStudied();
       logSession({
-        kind: 'lesson',
+        kind: 'focus',
         subject: selectedSubject,
         title: `Sesión de enfoque de ${completedMinutes} min`,
         minutes: completedMinutes,
@@ -70,7 +72,7 @@ export default function FocusScreen() {
       return;
     }
 
-    Alert.alert(
+    appAlert(
       'Terminar antes',
       `Llevas ${done} ${done === 1 ? 'minuto' : 'minutos'}. ¿Los guardamos en tu actividad?`,
       [
@@ -209,7 +211,7 @@ export default function FocusScreen() {
         <View className="p-3.5">
           {subjects.length === 0 ? (
             <Text className="text-[13px] text-text-secondary-light dark:text-text-secondary-dark">
-              Todavía no tienes materias. Márcalas en Mi escuela.
+              Todavía no tienes materias. Márcalas en Mi cuenta.
             </Text>
           ) : (
             <ChipGroup
@@ -254,14 +256,7 @@ export default function FocusScreen() {
         la app, y al terminar suma los minutos a tu actividad y a tu racha.
       </Note>
 
-      <Modal
-        visible={isCustomVisible}
-        transparent
-        statusBarTranslucent
-        navigationBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setCustomVisible(false)}
-      >
+      <AppModal visible={isCustomVisible} onRequestClose={() => setCustomVisible(false)}>
         <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
           <TouchableOpacity
             className="flex-1"
@@ -269,10 +264,11 @@ export default function FocusScreen() {
             onPress={() => setCustomVisible(false)}
           />
 
-          <View
-            className="rounded-t-[26px] px-[18px] pt-[18px]"
-            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-          >
+          <SheetSlide>
+            <View
+              className="rounded-t-[26px] px-[18px] pt-[18px]"
+              style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+            >
             <View className="mb-1 flex-row items-center">
               <View className="h-[34px] w-[34px]" />
               <Text className="flex-1 text-center text-[17px] font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -318,9 +314,10 @@ export default function FocusScreen() {
             >
               <Text className="text-[15px] font-bold text-white">Usar {customDraft} minutos</Text>
             </TouchableOpacity>
-          </View>
+            </View>
+          </SheetSlide>
         </View>
-      </Modal>
+      </AppModal>
     </ScreenShell>
   );
 }

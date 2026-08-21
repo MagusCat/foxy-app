@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { BrandLogo } from '@/components/brand-logo';
@@ -7,6 +7,7 @@ import { useScreenPadding } from '@/components/screen-header';
 import { Palette } from '@/constants/theme';
 import { type AuthProvider, useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 
 type ProviderButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -50,7 +51,7 @@ function LegalLink({ label }: { label: string }) {
       className="font-semibold"
       style={{ color: Palette.primary }}
       onPress={() =>
-        Alert.alert(
+        appAlert(
           label,
           'Este documento se publicará antes de abrir las cuentas. Mientras tanto, todo lo que escribes se queda en este dispositivo.',
         )

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Palette } from '@/constants/theme';
 
-export type PlanId = 'basico' | 'plus' | 'familia';
+export type PlanId = 'basico' | 'plus' | 'grupo';
 
 export type Plan = {
   id: PlanId;
@@ -13,13 +13,13 @@ export type Plan = {
   period: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-  soft: [string, string];
   badge?: string;
   benefits: string[];
   missing?: string[];
 };
 
 export const BASIC_DAILY_QUESTIONS = 10;
+export const BASIC_SUBJECT_LIMIT = 4;
 
 export const PLANS: Plan[] = [
   {
@@ -31,30 +31,28 @@ export const PLANS: Plan[] = [
     period: 'para siempre',
     icon: 'leaf-outline',
     color: '#10B981',
-    soft: ['#D1FAE5', '#122A22'],
     badge: 'Tu plan actual',
     benefits: [
       `${BASIC_DAILY_QUESTIONS} preguntas a Foxy cada día`,
-      'Materias ilimitadas y racha de estudio',
+      `${BASIC_SUBJECT_LIMIT} materias y racha de estudio`,
       'Escanea problemas con la cámara',
       'Adjunta PDF y documentos de texto',
       'Teclado matemático completo',
       'Sin anuncios y sin compras dentro del chat',
     ],
-    missing: ['Exámenes de práctica ilimitados', 'Lecciones en audio y modo voz'],
+    missing: ['Materias ilimitadas', 'Exámenes de práctica ilimitados', 'Lecciones en audio y modo voz'],
   },
   {
     id: 'plus',
     name: 'Fox Plus',
     shortName: 'Plus',
     tagline: 'Cuando quieres practicar todo lo que necesites.',
-    price: '$79',
-    period: 'al mes',
+    price: '$7',
+    period: 'USD al mes',
     icon: 'sparkles',
     color: Palette.accentBlue,
-    soft: ['#DBEAFE', '#152238'],
     benefits: [
-      'Preguntas y exámenes ilimitados',
+      'Materias, preguntas y exámenes ilimitados',
       'Lecciones en audio, podcast y modo voz',
       'Planes de estudio para tus exámenes',
       'Explicaciones paso a paso más detalladas',
@@ -62,19 +60,18 @@ export const PLANS: Plan[] = [
     ],
   },
   {
-    id: 'familia',
-    name: 'Fox Familia',
-    shortName: 'Familia',
-    tagline: 'Todo lo de Plus para hasta 5 personas de la casa.',
-    price: '$129',
-    period: 'al mes',
-    icon: 'home-outline',
+    id: 'grupo',
+    name: 'Fox Grupo',
+    shortName: 'Grupo',
+    tagline: 'Todo lo de Plus para hasta 5 personas del mismo grupo.',
+    price: '$25',
+    period: 'USD al mes',
+    icon: 'people-outline',
     color: Palette.accentPurple,
-    soft: ['#F3E8FF', '#241A33'],
     badge: 'Recomendado',
     benefits: [
       'Hasta 5 perfiles, uno por cada estudiante',
-      'Panel para mamá, papá o tutor',
+      'Panel compartido para el grupo',
       'Resumen del avance directo a su correo',
       'Límites de tiempo de uso configurables',
       'Contenido revisado y apropiado para cada edad',
@@ -82,6 +79,11 @@ export const PLANS: Plan[] = [
   },
 ];
 
-export function getPlan(id: PlanId): Plan {
-  return PLANS.find((plan) => plan.id === id) ?? PLANS[0];
+// El id anterior de este plan era 'familia'. Quien lo tenga guardado en
+// AsyncStorage debe seguir cayendo en Fox Grupo, no en Básico.
+const LEGACY_PLAN_IDS: Record<string, PlanId> = { familia: 'grupo' };
+
+export function getPlan(id: string): Plan {
+  const resolved = LEGACY_PLAN_IDS[id] ?? id;
+  return PLANS.find((plan) => plan.id === resolved) ?? PLANS[0];
 }

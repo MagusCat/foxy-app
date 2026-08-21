@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
-import { Alert, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { AvatarEditor } from '@/components/avatar-editor';
 import { TabHeader, useScreenPadding } from '@/components/screen-header';
@@ -10,6 +10,7 @@ import { buildAchievements, countUnlocked } from '@/constants/achievements';
 import { Palette } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { ThemePreference, useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useStudyActivity, formatMinutes } from '@/hooks/use-study-activity';
@@ -30,7 +31,7 @@ const THEME_OPTIONS: {
 
 export default function ProfileScreen() {
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { isDark, colors, preference, setPreference } = useTheme();
   const { signOut } = useAuth();
 
@@ -39,12 +40,10 @@ export default function ProfileScreen() {
   const [subjects] = usePersistentState<string[]>('foxy:subjects', []);
   const [, streak] = useDailyStreak();
   const { stats } = useStudyActivity();
-  const { plan, isBasic, questionsToday, limit, remaining } = useSubscription();
-  const { upcoming, events } = useAgenda();
+  const { plan, isBasic } = useSubscription();
+  const { events } = useAgenda();
   const { questions, saved } = useQuestionHistory();
   const goal = useDailyGoal();
-
-  const usedRatio = limit ? Math.min(questionsToday / limit, 1) : 0;
 
   const achievements = useMemo(
     () =>
@@ -57,23 +56,21 @@ export default function ProfileScreen() {
           examsCreated: stats.examsCreated,
           eventsPlanned: events.length,
           savedQuestions: saved.length,
-          goalsMet: [...stats.minutesByDay.values()].filter((minutes) => minutes >= goal.goal).length,
+          goalsMet: [...stats.focusMinutesByDay.values()].filter((minutes) => minutes >= goal.goal).length,
         }),
       ),
     [streak.best, stats, events.length, saved.length, goal.goal],
   );
 
   const handleLogout = () => {
-    Alert.alert(
+    appAlert(
       'Cerrar sesión',
-      'Todavía no existen las cuentas en línea, así que al cerrar sesión se borra tu perfil de este dispositivo: nombre, foto, escuela, salones, actividad y eventos. Tus preferencias de la app se quedan.',
+      'Todavía no existen las cuentas en línea, así que al cerrar sesión se borra tu perfil de este dispositivo: nombre, foto, escuela, cuadernos, actividad y eventos. Tus preferencias de la app se quedan.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Cerrar sesión',
           style: 'destructive',
-          // El gate del layout raíz ve que ya no hay sesión y lleva solo a la
-          // pantalla de entrada: aquí no hace falta navegar a mano.
           onPress: () => signOut(),
         },
       ],
@@ -156,29 +153,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {isBasic && limit ? (
-            <View className="mt-3.5">
-              <View className="mb-1.5 flex-row items-center justify-between">
-                <Text className="text-[12px] text-text-secondary-light dark:text-text-secondary-dark">
-                  Preguntas de hoy
-                </Text>
-                <Text className="text-[12px] font-bold" style={{ color: plan.color }}>
-                  {questionsToday} / {limit}
-                </Text>
-              </View>
-              <View className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: colors.card }}>
-                <View
-                  className="h-full rounded-full"
-                  style={{ width: `${Math.round(usedRatio * 100)}%`, backgroundColor: plan.color }}
-                />
-              </View>
-              <Text className="mt-1.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                {remaining === 0
-                  ? 'Se renuevan mañana. Los planes se cambian con un adulto.'
-                  : `Te quedan ${remaining} preguntas hoy. Sin anuncios ni cobros sorpresa.`}
-              </Text>
-            </View>
-          ) : null}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -252,13 +226,6 @@ export default function ProfileScreen() {
           <Row icon="stats-chart-outline" label="Mi actividad" onPress={() => router.push('/activity')} />
           <CardDivider />
           <Row
-            icon="calendar-outline"
-            label="Calendario y eventos"
-            value={upcoming.length > 0 ? `${upcoming.length} próximos` : undefined}
-            onPress={() => router.push('/activity')}
-          />
-          <CardDivider />
-          <Row
             icon="trophy-outline"
             label="Mis logros"
             value={`${achievements.unlocked}/${achievements.total}`}
@@ -275,24 +242,25 @@ export default function ProfileScreen() {
           <Row icon="timer-outline" label="Modo enfoque" onPress={() => router.push('/focus')} />
         </Card>
 
-        <SectionTitle>Cuenta</SectionTitle>
-        <Card>
-          <Row icon="person-outline" label="Mi cuenta" onPress={() => router.push('/settings/account')} />
-          <CardDivider />
-          <Row
-            icon="school-outline"
-            label="Mi escuela"
-            value={school || 'Sin agregar'}
-            onPress={() => router.push('/settings/school')}
-          />
-          <CardDivider />
-          <Row
-            icon="card-outline"
-            label="Suscripción"
-            value={plan.shortName}
-            onPress={() => router.push('/subscription')}
-          />
-        </Card>
+        <TouchableOpacity
+          className="mt-3 flex-row items-center rounded-2xl border px-3.5 py-3.5"
+          style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Calendario y eventos"
+          onPress={() => router.push('/calendar')}
+        >
+          <View
+            className="mr-3 h-8 w-8 items-center justify-center rounded-[10px]"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <Ionicons name="calendar-outline" size={17} color={colors.icon} />
+          </View>
+          <Text className="flex-1 text-[15px] font-medium text-text-primary-light dark:text-text-primary-dark">
+            Calendario y eventos
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.icon} />
+        </TouchableOpacity>
 
         <SectionTitle>Configuración</SectionTitle>
         <Card>

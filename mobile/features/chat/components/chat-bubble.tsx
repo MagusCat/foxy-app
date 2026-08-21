@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 
 import { useTheme } from '@/contexts/theme-context';
-import type { ChatMessage } from '@/hooks/use-chat';
+import type { ChatMessage } from '@/features/chat/hooks/use-chat';
 
 function formatTime(iso: string) {
   const date = new Date(iso);

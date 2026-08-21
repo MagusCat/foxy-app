@@ -125,7 +125,7 @@ export default function NotificationsScreen() {
         <SwitchRow
           icon="mail-outline"
           label="Resumen semanal"
-          description="Un correo con tu avance al adulto responsable"
+          description="Un correo con tu avance"
           value={prefs.weeklyReport}
           onValueChange={(value) => update('weeklyReport', value)}
           disabled={off}

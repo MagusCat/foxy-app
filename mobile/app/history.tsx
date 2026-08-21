@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { Card, Note, ScreenShell, softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
 import {
   ANSWER_MODES,
   usePendingQuestion,
@@ -40,7 +41,7 @@ function attachmentSummary(question: AskedQuestion) {
 }
 
 export default function HistoryScreen() {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { isDark, colors } = useTheme();
   const { questions, saved, toggleSaved, removeQuestion, clearUnsaved } = useQuestionHistory();
   const [, setPending] = usePendingQuestion();
@@ -59,14 +60,14 @@ export default function HistoryScreen() {
   };
 
   const handleDelete = (question: AskedQuestion) => {
-    Alert.alert('Eliminar pregunta', '¿Quitarla de tu historial?', [
+    appAlert('Eliminar pregunta', '¿Quitarla de tu historial?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: () => removeQuestion(question.id) },
     ]);
   };
 
   const handleClear = () => {
-    Alert.alert(
+    appAlert(
       'Limpiar historial',
       'Se borrarán las preguntas que no tengas guardadas. Las guardadas se quedan.',
       [

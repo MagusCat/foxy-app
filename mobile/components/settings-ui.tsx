@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardTypeOptions,
-  Modal,
   Pressable,
   ScrollView,
   Switch,
@@ -11,11 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { useScreenPadding } from '@/components/screen-header';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { AppModal } from '@/features/shared/components/portal';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 export function softTint(color: string, isDark: boolean) {
@@ -30,8 +30,9 @@ type ScreenShellProps = {
 
 export function ScreenShell({ title, subtitle, children }: ScreenShellProps) {
   const padding = useScreenPadding();
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { colors } = useTheme();
+  const keyboardHeight = useKeyboardHeight();
 
   return (
     <View className="flex-1 bg-bg-light dark:bg-bg-dark">
@@ -67,7 +68,7 @@ export function ScreenShell({ title, subtitle, children }: ScreenShellProps) {
 
       <ScrollView
         className="px-5"
-        contentContainerStyle={{ paddingBottom: padding.stackBottom }}
+        contentContainerStyle={{ paddingBottom: padding.stackBottom + keyboardHeight }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -314,14 +315,7 @@ export function PromptModal({
   const canSave = allowEmpty || trimmed.length > 0;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      statusBarTranslucent
-      navigationBarTranslucent
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
+    <AppModal visible={visible} onRequestClose={onCancel}>
       <View
         className="flex-1 items-center justify-center bg-black/55 px-6 dark:bg-black/80"
         style={{ paddingBottom: keyboardHeight }}
@@ -371,7 +365,7 @@ export function PromptModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

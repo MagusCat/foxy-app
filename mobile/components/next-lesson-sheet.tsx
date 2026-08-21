@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { appAlert } from '@/features/shared/components/overlay';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import { isTopicUnlocked, topicProgress, type StudyPlan } from '@/hooks/use-study-plans';
 
@@ -58,7 +60,7 @@ export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonS
     onClose();
     setTimeout(
       () =>
-        Alert.alert(
+        appAlert(
           label,
           `Foxy generará "${label.toLowerCase()}" sobre "${topicTitle}" en cuanto conectemos la IA.`,
         ),
@@ -77,28 +79,22 @@ export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonS
 
   const handlePickTopic = (title: string, unlocked: boolean) => {
     if (!unlocked) {
-      Alert.alert('Tema bloqueado', 'Termina el tema anterior para poder trabajar con este.');
+      appAlert('Tema bloqueado', 'Termina el tema anterior para poder trabajar con este.');
       return;
     }
     announce(pending ?? 'Lección', title);
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      statusBarTranslucent
-      navigationBarTranslucent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <AppModal visible={visible} onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
         <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
 
-        <View
-          className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
-          style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-        >
+        <SheetSlide>
+          <View
+            className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
+            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+          >
           <View className="mb-4 flex-row items-center">
             {pending ? (
               <TouchableOpacity
@@ -277,8 +273,9 @@ export function NextLessonSheet({ visible, onClose, plan, topicId }: NextLessonS
               </ScrollView>
             </>
           )}
-        </View>
+          </View>
+        </SheetSlide>
       </View>
-    </Modal>
+    </AppModal>
   );
 }

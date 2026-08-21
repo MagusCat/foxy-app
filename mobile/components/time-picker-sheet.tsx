@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { WheelHighlight, WheelPicker } from '@/components/wheel-picker';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
+import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { useSheetPaddingBottom } from '@/hooks/use-sheet-padding';
 import {
   HOUR_OPTIONS,
@@ -48,21 +49,15 @@ export function TimePickerSheet({
   }, [visible, value]);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      statusBarTranslucent
-      navigationBarTranslucent
-      animationType="slide"
-      onRequestClose={onCancel}
-    >
+    <AppModal visible={visible} onRequestClose={onCancel}>
       <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
         <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onCancel} />
 
-        <View
-          className="rounded-t-[26px] px-[18px] pt-[18px]"
-          style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
-        >
+        <SheetSlide>
+          <View
+            className="rounded-t-[26px] px-[18px] pt-[18px]"
+            style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+          >
           <View className="mb-1 flex-row items-center">
             <View className="h-[34px] w-[34px]" />
             <Text className="flex-1 text-center text-[17px] font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -124,8 +119,9 @@ export function TimePickerSheet({
           >
             <Text className="text-[15px] font-bold text-white">Guardar</Text>
           </TouchableOpacity>
-        </View>
+          </View>
+        </SheetSlide>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
