@@ -10,6 +10,7 @@ export type EventKind = 'examen' | 'tarea' | 'clase' | 'repaso';
 export type AgendaEvent = {
   id: string;
   title: string;
+  description?: string;
   subject: string;
   date: string;
   time?: string;

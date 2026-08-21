@@ -1,6 +1,12 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { BackHandler, StyleSheet } from 'react-native';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { BackHandler, Dimensions, StyleSheet } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 let nodes = new Map<string, ReactNode>();
 const listeners = new Set<() => void>();
@@ -54,8 +60,20 @@ export function PortalHost() {
 
 let portalIdCounter = 0;
 
+const SHEET_SLIDE_DISTANCE = Math.round(Dimensions.get('window').height * 0.6);
+
 export function SheetSlide({ children }: { children: ReactNode }) {
-  return <Animated.View entering={SlideInDown.duration(260)}>{children}</Animated.View>;
+  const translateY = useSharedValue(SHEET_SLIDE_DISTANCE);
+
+  useEffect(() => {
+    translateY.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) });
+  }, [translateY]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
 type AppModalProps = {

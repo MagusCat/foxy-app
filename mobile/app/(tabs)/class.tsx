@@ -111,10 +111,10 @@ export default function ClassScreen() {
         showsVerticalScrollIndicator={false}
       >
         <TabHeader
-          title="Cuaderno"
+          title={rooms.length > 0 ? `Mis cuadernos - ${rooms.length}` : 'Mis cuadernos'}
           subtitle={
             rooms.length > 0
-              ? `${rooms.length} ${rooms.length === 1 ? 'cuaderno' : 'cuadernos'}`
+              ? 'Tus materias organizadas en cuadernos'
               : 'Organiza tus materias en cuadernos'
           }
         />

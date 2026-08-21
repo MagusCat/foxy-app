@@ -9,11 +9,7 @@ export function useKeyboardHeight() {
 
     const show = (event: KeyboardEvent) => {
       const { height: reported, screenY } = event.endCoordinates;
-      // En Android edge-to-edge el alto reportado puede quedarse corto (no
-      // incluye la franja del nav bar/gestos) y el contenido queda medio
-      // tapado. Manda el mayor entre lo reportado y lo que el teclado
-      // ocupa de verdad según su posición en pantalla.
-      const computed = Math.max(0, Dimensions.get('window').height - screenY);
+      const computed = Math.max(0, Dimensions.get('screen').height - screenY);
       const next = Math.max(reported > 0 ? reported : 0, computed);
       if (!isVisible && next <= 0) return;
       isVisible = true;

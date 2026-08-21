@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppHeader, useScreenPadding } from '@/components/screen-header';
@@ -26,6 +26,7 @@ const LESSON_TYPES: { label: string; icon: keyof typeof Ionicons.glyphMap; color
   { label: 'Tarjetas de memoria', icon: 'albums-outline', color: Palette.flameOrange },
   { label: 'Examen escrito simulado', icon: 'create-outline', color: '#14B8A6' },
 ];
+const START_SHEET_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0.88);
 
 export default function HomeScreen() {
   const padding = useScreenPadding();
@@ -233,8 +234,8 @@ export default function HomeScreen() {
           <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setStartModalVisible(false)} />
           <SheetSlide>
             <View
-              className="max-h-[88%] rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
-              style={{ paddingBottom: sheetPaddingBottom }}
+              className="rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
+              style={{ maxHeight: START_SHEET_MAX_HEIGHT, paddingBottom: sheetPaddingBottom }}
             >
             <View className="mb-3.5 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">

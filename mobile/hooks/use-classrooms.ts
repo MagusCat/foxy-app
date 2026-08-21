@@ -6,6 +6,12 @@ export const CLASSROOMS_KEY = 'foxy:classrooms';
 
 export type ClassPostKind = 'anuncio' | 'tarea' | 'material';
 
+export type PostAttachment = {
+  kind: 'image' | 'file';
+  name: string;
+  uri: string;
+};
+
 export type ClassPost = {
   id: string;
   kind: ClassPostKind;
@@ -13,6 +19,7 @@ export type ClassPost = {
   text: string;
   at: string;
   due?: string;
+  attachments?: PostAttachment[];
 };
 
 export type RoomVisibility = 'publico' | 'privado';
@@ -23,7 +30,6 @@ export type Classroom = {
   subject: string;
   schedule: string;
   code: string;
-  // Opcionales: los cuadernos creados antes de esta versión no los traen.
   days?: string[];
   time?: string;
   visibility?: RoomVisibility;
@@ -48,7 +54,6 @@ export const VISIBILITY_META: Record<
   },
 };
 
-/** Los cuadernos antiguos no guardaban visibilidad: se asumen privados. */
 export function roomVisibility(room: Classroom): RoomVisibility {
   return room.visibility ?? 'privado';
 }

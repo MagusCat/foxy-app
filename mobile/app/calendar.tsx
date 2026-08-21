@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Dimensions,
   ScrollView,
   Text,
   TextInput,
@@ -11,6 +12,7 @@ import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
 
 import { useScreenPadding } from '@/components/screen-header';
 import { TimePickerSheet } from '@/components/time-picker-sheet';
+import { DatePickerSheet } from '@/components/date-picker-sheet';
 import { ChipGroup, softTint } from '@/components/settings-ui';
 import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
@@ -40,17 +42,17 @@ const KIND_OPTIONS: { value: EventKind; label: string }[] = [
   { value: 'repaso', label: 'Repaso' },
 ];
 
-type Filter = 'todo' | 'mios' | 'clase';
+const EVENT_SHEET_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0.88);
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'mios', label: 'Mis eventos' },
-  { value: 'clase', label: 'Clase' },
-];
+const formatDayShort = (day: string) => {
+  const date = new Date(`${day}T00:00:00`);
+  return `${date.getDate()} ${MONTH_NAMES[date.getMonth()].slice(0, 3).toLowerCase()} ${date.getFullYear()}`;
+};
 
 type CalendarItem = {
   id: string;
   title: string;
+  description?: string;
   subject: string;
   date: string;
   time?: string;
@@ -70,7 +72,6 @@ export default function CalendarScreen() {
   const [subjects] = usePersistentState<string[]>('foxy:subjects', ['Matemáticas']);
 
   const today = localDay(new Date());
-  const [filter, setFilter] = useState<Filter>('todo');
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -79,7 +80,9 @@ export default function CalendarScreen() {
 
   const [isEventModalVisible, setEventModalVisible] = useState(false);
   const [isTimeVisible, setTimeVisible] = useState(false);
+  const [isDateVisible, setDateVisible] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
   const [eventKind, setEventKind] = useState<EventKind>('examen');
   const [eventSubject, setEventSubject] = useState(subjects[0] ?? 'Matemáticas');
   const [eventTime, setEventTime] = useState('');
@@ -88,6 +91,7 @@ export default function CalendarScreen() {
     const fromEvents: CalendarItem[] = events.map((event) => ({
       id: event.id,
       title: event.title,
+      description: event.description,
       subject: event.subject,
       date: event.date,
       time: event.time,
@@ -110,23 +114,17 @@ export default function CalendarScreen() {
     );
   }, [events, plans]);
 
-  const visible = useMemo(() => {
-    if (filter === 'mios') return items.filter((item) => item.kind !== 'clase');
-    if (filter === 'clase') return items.filter((item) => item.kind === 'clase');
-    return items;
-  }, [items, filter]);
-
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
-    visible.forEach((item) => {
+    items.forEach((item) => {
       const list = map.get(item.date) ?? [];
       list.push(item);
       map.set(item.date, list);
     });
     return map;
-  }, [visible]);
+  }, [items]);
 
-  const upcoming = useMemo(() => visible.filter((item) => item.date >= today), [visible, today]);
+  const upcoming = useMemo(() => items.filter((item) => item.date >= today), [items, today]);
   const selectedItems = byDay.get(selectedDay) ?? [];
   const grid = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
 
@@ -138,6 +136,7 @@ export default function CalendarScreen() {
 
   const openEventModal = () => {
     setEventTitle('');
+    setEventDescription('');
     setEventTime('');
     setEventKind('examen');
     setEventSubject(subjects[0] ?? 'Matemáticas');
@@ -153,6 +152,7 @@ export default function CalendarScreen() {
 
     addEvent({
       title,
+      description: eventDescription.trim() || undefined,
       subject: eventSubject,
       kind: eventKind,
       date: selectedDay,
@@ -167,7 +167,14 @@ export default function CalendarScreen() {
       return;
     }
 
-    appAlert(item.title, `${EVENT_KIND_META[item.kind].label} · ${item.subject}`, [
+    const details = [
+      `${EVENT_KIND_META[item.kind].label} · ${item.subject}`,
+      item.description ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    appAlert(item.title, details, [
       { text: 'Cerrar', style: 'cancel' },
       {
         text: 'Eliminar',
@@ -218,36 +225,7 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
-          className="mt-5 grow-0"
-        >
-          {FILTERS.map((item) => {
-            const isActive = filter === item.value;
-            return (
-              <TouchableOpacity
-                key={item.value}
-                className="h-10 items-center justify-center rounded-full px-4"
-                style={{ backgroundColor: isActive ? colors.text : colors.surface }}
-                activeOpacity={0.8}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
-                onPress={() => setFilter(item.value)}
-              >
-                <Text
-                  className="text-[14px] font-semibold"
-                  style={{ color: isActive ? colors.background : colors.text }}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        <View className="mt-4 px-5">
+        <View className="mt-5 px-5">
           <View
             className="rounded-[20px] border p-4"
             style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
@@ -393,8 +371,12 @@ export default function CalendarScreen() {
 
           <SheetSlide>
             <View
-              className="max-h-[88%] rounded-t-[26px] px-[18px] pt-[18px]"
-              style={{ backgroundColor: colors.card, paddingBottom: sheetPaddingBottom }}
+              className="rounded-t-[26px] px-[18px] pt-[18px]"
+              style={{
+                backgroundColor: colors.card,
+                maxHeight: EVENT_SHEET_MAX_HEIGHT,
+                paddingBottom: sheetPaddingBottom,
+              }}
             >
             <View className="mb-1 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -411,8 +393,8 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text className="mb-3.5 text-xs text-text-secondary-light dark:text-text-secondary-dark">
-              {describeEventDate(selectedDay)} · {selectedDay}
+            <Text className="mb-3 text-xs text-text-secondary-light dark:text-text-secondary-dark">
+              {describeEventDate(selectedDay)}
             </Text>
 
             <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
@@ -425,6 +407,41 @@ export default function CalendarScreen() {
                 onChangeText={setEventTitle}
                 maxLength={60}
               />
+
+              <TextInput
+                className="mb-3.5 rounded-[14px] border px-3.5 py-2.5 text-sm text-text-primary-light dark:text-text-primary-dark"
+                style={{ backgroundColor: colors.background, borderColor: colors.cardBorder, minHeight: 64 }}
+                placeholder="Descripción (opcional). Ej. Temas que entran, material…"
+                placeholderTextColor={colors.icon}
+                value={eventDescription}
+                onChangeText={setEventDescription}
+                maxLength={200}
+                multiline
+              />
+
+              <Text className="mb-2 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
+                Fecha
+              </Text>
+              <View className="mb-3 flex-row items-center gap-2">
+                <TouchableOpacity
+                  className="flex-1 flex-row items-center rounded-[14px] border px-3.5 py-3"
+                  style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Abrir el calendario para elegir la fecha del evento"
+                  onPress={() => setDateVisible(true)}
+                >
+                  <Ionicons name="calendar-outline" size={17} color={colors.icon} />
+                  <Text
+                    className="ml-2.5 flex-1 text-sm"
+                    style={{ color: colors.text }}
+                    numberOfLines={1}
+                  >
+                    {describeEventDate(selectedDay)} · {formatDayShort(selectedDay)}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.icon} />
+                </TouchableOpacity>
+              </View>
 
               <Text className="mb-2 text-xs font-semibold text-text-primary-light dark:text-text-primary-dark">
                 Tipo
@@ -494,6 +511,20 @@ export default function CalendarScreen() {
           </SheetSlide>
         </View>
       </AppModal>
+
+      <DatePickerSheet
+        visible={isDateVisible}
+        title="Fecha del evento"
+        description="Toca un día para elegirlo"
+        value={selectedDay}
+        onCancel={() => setDateVisible(false)}
+        onSelect={(day) => {
+          setSelectedDay(day);
+          setDateVisible(false);
+          const date = new Date(`${day}T00:00:00`);
+          setCursor({ year: date.getFullYear(), month: date.getMonth() });
+        }}
+      />
 
       <TimePickerSheet
         visible={isTimeVisible}
@@ -566,6 +597,15 @@ function CalendarRow({ item, onPress }: { item: CalendarItem; onPress: () => voi
         >
           {item.title}
         </Text>
+
+        {item.description ? (
+          <Text
+            className="mt-0.5 text-[12px] leading-[17px] text-text-secondary-light dark:text-text-secondary-dark"
+            numberOfLines={1}
+          >
+            {item.description}
+          </Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );

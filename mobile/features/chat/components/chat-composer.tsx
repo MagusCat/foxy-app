@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
@@ -33,6 +33,7 @@ const ACTION_CIRCLE = isIOS ? 'h-10 w-10' : 'h-9 w-9';
 const CAMERA_PILL = isIOS ? 'h-10 w-12' : 'h-9 w-11';
 const TALK_PILL = isIOS ? 'h-10' : 'h-9';
 const ACTION_ICON_SIZE = isIOS ? 20 : 18;
+const SUBJECT_SHEET_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0.85);
 
 type ChatComposerProps = {
   onSent: (conversationId: string) => void;
@@ -191,33 +192,46 @@ export function ChatComposer({ onSent, initialText, autoCamera, conversationId }
   return (
     <View className="w-full items-center px-5" style={{ paddingBottom: keyboardHeight > 0 ? sheetPaddingBottom : 0 }}>
       <View className="z-10 -mb-[13px] flex-row items-center gap-2">
-        <TouchableOpacity
-          className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
-          style={{ borderColor: subjectAccent.color, elevation: 4 }}
-          activeOpacity={isSubjectLocked ? 1 : 0.8}
-          disabled={isSubjectLocked}
-          accessibilityRole="button"
-          accessibilityLabel={`Materia: ${activeSubject}${isSubjectLocked ? ' (fija en este tema)' : ''}`}
-          accessibilityHint={
-            isSubjectLocked
-              ? 'La materia no se puede cambiar dentro de un tema abierto'
-              : 'Cambiar materia'
-          }
-          onPress={() => {
-            setIsEditMode(false);
-            setSubjectModalVisible(true);
-          }}
-        >
-          <Text className="text-xs font-semibold" style={{ color: subjectAccent.color }}>
-            {activeSubject}
-          </Text>
-          <Ionicons
-            name={isSubjectLocked ? 'lock-closed' : 'swap-vertical'}
-            size={14}
-            color={subjectAccent.color}
-            style={{ marginLeft: 6 }}
-          />
-        </TouchableOpacity>
+        {isSubjectLocked ? (
+          <View
+            className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
+            style={{ borderColor: subjectAccent.color, elevation: 4 }}
+            accessibilityLabel={`Materia: ${activeSubject} (fija en este tema)`}
+          >
+            <Text className="text-xs font-semibold" style={{ color: subjectAccent.color }}>
+              {activeSubject}
+            </Text>
+            <Ionicons
+              name="lock-closed"
+              size={14}
+              color={subjectAccent.color}
+              style={{ marginLeft: 6 }}
+            />
+          </View>
+        ) : (
+          <TouchableOpacity
+            className="flex-row items-center rounded-[18px] border bg-white px-4 py-[7px] dark:bg-[#1B1522]"
+            style={{ borderColor: subjectAccent.color, elevation: 4 }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Materia: ${activeSubject}`}
+            accessibilityHint="Cambiar materia"
+            onPress={() => {
+              setIsEditMode(false);
+              setSubjectModalVisible(true);
+            }}
+          >
+            <Text className="text-xs font-semibold" style={{ color: subjectAccent.color }}>
+              {activeSubject}
+            </Text>
+            <Ionicons
+              name="swap-vertical"
+              size={14}
+              color={subjectAccent.color}
+              style={{ marginLeft: 6 }}
+            />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           className="flex-row items-center rounded-[18px] border border-card-light-border bg-white px-3 py-[7px] dark:border-surface-dark-border dark:bg-[#1B1522]"
@@ -381,8 +395,8 @@ export function ChatComposer({ onSent, initialText, autoCamera, conversationId }
           />
           <SheetSlide>
             <View
-              className="max-h-[85%] flex-col rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
-              style={{ paddingBottom: sheetPaddingBottom }}
+              className="flex-col rounded-t-[26px] bg-white px-[18px] pt-[18px] dark:bg-[#16141D]"
+              style={{ maxHeight: SUBJECT_SHEET_MAX_HEIGHT, paddingBottom: sheetPaddingBottom }}
             >
             {subjectModalMode === 'list' ? (
               <>
