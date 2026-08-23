@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { deleteMedia } from '@/lib/media';
 
 export const CONVERSATIONS_KEY = 'foxy:conversations';
 const LEGACY_CHAT_KEY = 'foxy:chat';
@@ -172,11 +173,25 @@ export function useChat() {
     [setConversations],
   );
 
-  const remove = useCallback((id: string) => {
-    setConversations((prev) => prev.filter((conversation) => conversation.id !== id));
-  }, [setConversations]);
+  const remove = useCallback(
+    (id: string) => {
+      const target = conversations.find((conversation) => conversation.id === id);
+      target?.messages.forEach((message) =>
+        message.attachments?.forEach((attachment) => deleteMedia(attachment.uri)),
+      );
+      setConversations((prev) => prev.filter((conversation) => conversation.id !== id));
+    },
+    [conversations, setConversations],
+  );
 
-  const clearAll = useCallback(() => setConversations([]), [setConversations]);
+  const clearAll = useCallback(() => {
+    conversations.forEach((conversation) =>
+      conversation.messages.forEach((message) =>
+        message.attachments?.forEach((attachment) => deleteMedia(attachment.uri)),
+      ),
+    );
+    setConversations([]);
+  }, [conversations, setConversations]);
 
   const groups = useMemo<SubjectGroup[]>(() => {
     const bySubject = new Map<string, Conversation[]>();

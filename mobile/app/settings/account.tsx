@@ -31,6 +31,7 @@ import { useTheme } from '@/contexts/theme-context';
 import { appAlert, useOverlay } from '@/features/shared/components/overlay';
 import { useSubjectLimit } from '@/features/shared/hooks/use-subject-limit';
 import { clearPersistedState, usePersistentState, SESSION_KEYS } from '@/hooks/use-persistent-state';
+import { deleteAllMedia } from '@/lib/media';
 import { useSubscription } from '@/hooks/use-subscription';
 
 type EditableField = 'name' | 'school' | null;
@@ -124,6 +125,7 @@ export default function AccountScreen() {
           style: 'destructive',
           onPress: async () => {
             await clearPersistedState(SESSION_KEYS);
+            deleteAllMedia();
             appAlert('Listo', 'Se borró tu información de este dispositivo.');
           },
         },

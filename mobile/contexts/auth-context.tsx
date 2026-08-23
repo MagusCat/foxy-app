@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 
 import { clearPersistedState, SESSION_KEYS, usePersistentState } from '@/hooks/use-persistent-state';
+import { deleteAllMedia } from '@/lib/media';
 
 export type AuthProvider = 'google' | 'apple' | 'email';
 
@@ -56,6 +57,7 @@ export function AuthProviderContext({ children }: { children: React.ReactNode })
 
   const signOut = useCallback(async () => {
     await clearPersistedState(SESSION_KEYS);
+    deleteAllMedia();
     setSession(null);
   }, [setSession]);
 

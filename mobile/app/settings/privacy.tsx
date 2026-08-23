@@ -4,6 +4,7 @@ import { Linking, Text, View } from 'react-native';
 import { Card, CardDivider, Note, Row, ScreenShell, SectionTitle } from '@/components/settings-ui';
 import { appAlert } from '@/features/shared/components/overlay';
 import { clearPersistedState, STORAGE_KEYS } from '@/hooks/use-persistent-state';
+import { deleteAllMedia } from '@/lib/media';
 
 const STORED_HERE = [
   'Tu nombre y tu foto de perfil',
@@ -24,6 +25,7 @@ export default function PrivacyScreen() {
           style: 'destructive',
           onPress: async () => {
             await clearPersistedState(STORAGE_KEYS);
+            deleteAllMedia();
             appAlert('Datos borrados', 'Tu información en este dispositivo quedó como al inicio.');
           },
         },
@@ -59,7 +61,11 @@ export default function PrivacyScreen() {
           ))}
         </View>
       </Card>
-      <Note>Las fotos y archivos que adjuntas no se copian: solo se guarda dónde están.</Note>
+      <Note>
+        Las fotos y archivos que adjuntas se copian dentro de Fox, solo en este dispositivo, y se
+        borran cuando eliminas el examen, cuaderno o conversación donde los pusiste —o cuando borras
+        tus datos.
+      </Note>
 
       <SectionTitle>Permisos</SectionTitle>
       <Card>

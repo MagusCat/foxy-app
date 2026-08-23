@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { deleteMedia } from '@/lib/media';
 
 export const CLASSROOMS_KEY = 'foxy:classrooms';
 
@@ -110,15 +111,33 @@ export function useClassrooms() {
   );
 
   const removePost = useCallback(
-    (id: string, postId: string) =>
-      updateRoom(id, (room) => ({
-        ...room,
-        posts: (room.posts ?? []).filter((post) => post.id !== postId),
-      })),
-    [updateRoom],
+    (id: string, postId: string) => {
+      const room = rooms.find((item) => item.id === id);
+      room?.posts
+        ?.find((post) => post.id === postId)
+        ?.attachments?.forEach((file) => deleteMedia(file.uri));
+      updateRoom(id, (current) => ({
+        ...current,
+        posts: (current.posts ?? []).filter((post) => post.id !== postId),
+      }));
+    },
+    [rooms, updateRoom],
   );
 
-  return { rooms, setRooms, hydrated, updateRoom, addPost, removePost };
+  // Borra el cuaderno y los archivos copiados de todos sus posts: sin esto,
+  // eliminar un cuaderno con tareas adjuntas deja las copias huérfanas en disco.
+  const removeRoom = useCallback(
+    (id: string) => {
+      const room = rooms.find((item) => item.id === id);
+      room?.posts?.forEach((post) =>
+        post.attachments?.forEach((file) => deleteMedia(file.uri)),
+      );
+      setRooms((prev) => prev.filter((item) => item.id !== id));
+    },
+    [rooms, setRooms],
+  );
+
+  return { rooms, setRooms, hydrated, updateRoom, addPost, removePost, removeRoom };
 }
 
 export function useClassroom(id?: string) {

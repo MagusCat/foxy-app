@@ -37,3 +37,19 @@ export function deleteMedia(uri?: string) {
     return;
   }
 }
+
+/**
+ * Borra la carpeta entera de medios copiados. Se usa al resetear los datos
+ * del dispositivo (cerrar sesión, borrar cuenta, borrar mis datos): sin esto
+ * las fotos y archivos copiados por `persistMedia` quedan huérfanos en disco
+ * aunque se limpie AsyncStorage. La carpeta se recrea sola en el próximo
+ * `persistMedia`.
+ */
+export function deleteAllMedia() {
+  try {
+    const folder = new Directory(Paths.document, MEDIA_FOLDER);
+    if (folder.exists) folder.delete();
+  } catch {
+    // Silencioso: que no se pueda borrar la carpeta no debe bloquear el reseteo.
+  }
+}

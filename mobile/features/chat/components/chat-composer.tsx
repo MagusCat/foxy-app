@@ -13,6 +13,7 @@ import { appAlert } from '@/features/shared/components/overlay';
 import { AppModal, SheetSlide } from '@/features/shared/components/portal';
 import { useSubjectLimit } from '@/features/shared/hooks/use-subject-limit';
 import { describeAttachment, useAttachments } from '@/hooks/use-attachments';
+import { persistMedia } from '@/lib/media';
 import { useDailyStreak } from '@/hooks/use-daily-streak';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { usePersistentState } from '@/hooks/use-persistent-state';
@@ -127,7 +128,14 @@ export function ChatComposer({ onSent, initialText, autoCamera, conversationId }
     const images = attachments.filter((item) => item.kind === 'image').length;
     const files = attachments.length - images;
     const text = inputMessage.trim();
-    const sentAttachments = attachments.map((item) => ({ kind: item.kind, name: item.name, uri: item.uri }));
+    // Se copian a almacenamiento permanente: las URIs del picker viven en la
+    // caché y el SO puede vaciarlas, pero la conversación se guarda para
+    // siempre. Sin esto, las miniaturas del historial se rompen con el tiempo.
+    const sentAttachments = attachments.map((item) => ({
+      kind: item.kind,
+      name: item.name,
+      uri: persistMedia(item.uri, item.kind === 'image' ? 'chat-img' : 'chat-doc'),
+    }));
 
     registerQuestion();
     markStudied();
