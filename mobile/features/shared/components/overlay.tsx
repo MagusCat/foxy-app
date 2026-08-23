@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { BackHandler, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
@@ -149,6 +149,7 @@ function SheetHost({ sheet, onClose }: { sheet: SheetRequest | null; onClose: ()
   return (
     <Animated.View
       entering={FadeIn.duration(180)}
+      exiting={FadeOut.duration(150)}
       style={[StyleSheet.absoluteFill, { zIndex: 950, elevation: 950 }]}
     >
       <View className="flex-1 justify-end bg-black/45 dark:bg-black/75">
@@ -186,6 +187,7 @@ function DialogHost({ dialog, onClose }: { dialog: DialogRequest | null; onClose
   return (
     <Animated.View
       entering={FadeIn.duration(180)}
+      exiting={FadeOut.duration(150)}
       style={[StyleSheet.absoluteFill, { zIndex: 1000, elevation: 1000 }]}
     >
       <View className="flex-1 items-center justify-center bg-black/55 px-6 dark:bg-black/80">

@@ -3,6 +3,7 @@ import { BackHandler, Dimensions, StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -49,6 +50,7 @@ export function PortalHost() {
         <Animated.View
           key={id}
           entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(150)}
           style={[StyleSheet.absoluteFill, { zIndex: 900, elevation: 900 }]}
         >
           {node}

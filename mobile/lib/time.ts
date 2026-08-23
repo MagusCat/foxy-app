@@ -31,3 +31,9 @@ export function formatTime12(value: string) {
   const { hour, minute, meridiem } = parseTime(value);
   return `${hour}:${minute} ${meridiem}`;
 }
+
+export function localDay(date: Date) {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}

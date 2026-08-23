@@ -25,11 +25,6 @@ export type Attachment = {
   size?: number;
 };
 
-/**
- * La cámara es el único permiso que se pide: lanzar la galería no necesita
- * permiso en Android (doc SDK 54). Nunca devuelve `false` en silencio: si no
- * se puede continuar, el usuario siempre ve por qué, con "Abrir ajustes".
- */
 async function ensureCameraPermission(): Promise<boolean> {
   const current = await ImagePicker.getCameraPermissionsAsync();
   if (current.granted) return true;
@@ -127,14 +122,12 @@ export function useAttachments() {
       ]);
       warnIfTrimmed(1, accepted);
     } catch (error) {
-      console.log('Error abriendo la cámara:', error);
+      if (__DEV__) console.warn('Error abriendo la cámara:', error);
       appAlert('No se pudo abrir la cámara', 'Cierra otras apps que la estén usando e inténtalo de nuevo.');
     }
   }, [addAttachments]);
 
   const addFromLibrary = useCallback(async () => {
-    // La galería no pide permiso: pedirlo y bloquear si se deniega deja el
-    // botón muerto (advertencia 0.4 del doc). Solo la cámara lo necesita.
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -168,7 +161,7 @@ export function useAttachments() {
       );
       warnIfTrimmed(assets.length, accepted);
     } catch (error) {
-      console.log('Error abriendo la galería:', error);
+      if (__DEV__) console.warn('Error abriendo la galería:', error);
       appAlert('No se pudieron abrir tus fotos', 'Inténtalo de nuevo.');
     }
   }, [addAttachments]);
@@ -223,7 +216,7 @@ export function useAttachments() {
         warnIfTrimmed(valid.length, accepted);
       }
     } catch (error) {
-      console.log('Error abriendo el selector de archivos:', error);
+      if (__DEV__) console.warn('Error abriendo el selector de archivos:', error);
       appAlert('No se pudo abrir el archivo', 'Inténtalo de nuevo.');
     }
   }, [addAttachments]);
@@ -242,9 +235,6 @@ export async function pickSingleImage(source: 'camera' | 'library'): Promise<str
   if (source === 'camera' && !(await ensureCameraPermission())) return null;
 
   try {
-    // Sin `allowsEditing` ni `shape`: el recortador del fabricante rompe en
-    // algunos dispositivos (advertencia 0.3). La confirmación con la foto en
-    // círculo la hace la propia app, dentro de avatar-editor.
     const result =
       source === 'camera'
         ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6, exif: false })
@@ -257,7 +247,7 @@ export async function pickSingleImage(source: 'camera' | 'library'): Promise<str
     if (result.canceled) return null;
     return result.assets?.[0]?.uri ?? null;
   } catch (error) {
-    console.log('Error eligiendo la foto de perfil:', error);
+    if (__DEV__) console.warn('Error eligiendo la foto de perfil:', error);
     appAlert('No se pudo cambiar tu foto', 'Inténtalo de nuevo.');
     return null;
   }

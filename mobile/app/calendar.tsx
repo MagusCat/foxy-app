@@ -586,7 +586,7 @@ function CalendarRow({ item, onPress }: { item: CalendarItem; onPress: () => voi
 
           {item.time ? (
             <Text className="ml-2 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-              {item.time}
+              {formatTime12(item.time)}
             </Text>
           ) : null}
         </View>
