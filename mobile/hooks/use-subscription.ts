@@ -2,17 +2,12 @@ import { useCallback, useMemo } from 'react';
 
 import { BASIC_DAILY_QUESTIONS, BASIC_SUBJECT_LIMIT, getPlan, type PlanId } from '@/constants/plans';
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { localDay } from '@/lib/time';
 
 type DailyUsage = {
   day: string;
   questions: number;
 };
-
-function localDay(date: Date) {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 export function useSubscription() {
   const [planId, setPlanId] = usePersistentState<PlanId>('foxy:plan', 'basico');

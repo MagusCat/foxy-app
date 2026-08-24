@@ -18,6 +18,7 @@ import {
   DEFAULT_SCHOOL_PROFILE,
   describeGrade,
   GROUP_OPTIONS,
+  LEVEL_SKIPPED,
   SCHOOL_STAGES,
   SHIFTS,
   type SchoolProfile,
@@ -30,6 +31,7 @@ import { useTheme } from '@/contexts/theme-context';
 import { appAlert, useOverlay } from '@/features/shared/components/overlay';
 import { useSubjectLimit } from '@/features/shared/hooks/use-subject-limit';
 import { clearPersistedState, usePersistentState, SESSION_KEYS } from '@/hooks/use-persistent-state';
+import { deleteAllMedia } from '@/lib/media';
 import { useSubscription } from '@/hooks/use-subscription';
 
 type EditableField = 'name' | 'school' | null;
@@ -65,7 +67,9 @@ export default function AccountScreen() {
   const [editing, setEditing] = useState<EditableField>(null);
 
   const stage = SCHOOL_STAGES.find((item) => item.value === profile.stage);
-  const isGradeChosen = Boolean(profile.stage && profile.level && profile.grade);
+  const isGradeChosen = Boolean(
+    profile.stage && profile.level && profile.level !== LEVEL_SKIPPED,
+  );
   const catalog = useMemo(() => mergeSubjects(subjects), [subjects]);
   const selected = useMemo(
     () => new Set(subjects.map((item) => item.toLowerCase())),
@@ -121,6 +125,7 @@ export default function AccountScreen() {
           style: 'destructive',
           onPress: async () => {
             await clearPersistedState(SESSION_KEYS);
+            deleteAllMedia();
             appAlert('Listo', 'Se borró tu información de este dispositivo.');
           },
         },
@@ -216,8 +221,11 @@ export default function AccountScreen() {
                 {stage.noun === 'grado' ? 'Grado' : 'Año'}
               </Text>
               <ChipGroup
-                options={stage.levels.map((level) => ({ value: level, label: `${level} ${stage.noun}` }))}
-                selected={profile.level ?? ''}
+                options={[
+                  ...stage.levels.map((level) => ({ value: level, label: `${level} ${stage.noun}` })),
+                  { value: LEVEL_SKIPPED, label: 'Prefiero no decirlo' },
+                ]}
+                selected={(profile.level ?? '') as string}
                 onSelect={(level) => updateProfile({ level })}
               />
 
@@ -226,7 +234,7 @@ export default function AccountScreen() {
               </Text>
               <ChipGroup
                 options={[
-                  { value: '', label: 'Sin grupo' },
+                  { value: '', label: 'Prefiero no decirlo' },
                   ...GROUP_OPTIONS.map((group) => ({ value: group, label: group })),
                 ]}
                 selected={profile.group ?? ''}

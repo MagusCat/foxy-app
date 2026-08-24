@@ -226,6 +226,13 @@ export default function ProfileScreen() {
           <Row icon="stats-chart-outline" label="Mi actividad" onPress={() => router.push('/activity')} />
           <CardDivider />
           <Row
+            icon="calendar-outline"
+            label="Calendario y eventos"
+            value={events.length > 0 ? `${events.length}` : undefined}
+            onPress={() => router.push('/calendar')}
+          />
+          <CardDivider />
+          <Row
             icon="trophy-outline"
             label="Mis logros"
             value={`${achievements.unlocked}/${achievements.total}`}
@@ -241,26 +248,6 @@ export default function ProfileScreen() {
           <CardDivider />
           <Row icon="timer-outline" label="Modo enfoque" onPress={() => router.push('/focus')} />
         </Card>
-
-        <TouchableOpacity
-          className="mt-3 flex-row items-center rounded-2xl border px-3.5 py-3.5"
-          style={{ backgroundColor: colors.card, borderColor: colors.cardBorder }}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Calendario y eventos"
-          onPress={() => router.push('/calendar')}
-        >
-          <View
-            className="mr-3 h-8 w-8 items-center justify-center rounded-[10px]"
-            style={{ backgroundColor: colors.surface }}
-          >
-            <Ionicons name="calendar-outline" size={17} color={colors.icon} />
-          </View>
-          <Text className="flex-1 text-[15px] font-medium text-text-primary-light dark:text-text-primary-dark">
-            Calendario y eventos
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.icon} />
-        </TouchableOpacity>
 
         <SectionTitle>Configuración</SectionTitle>
         <Card>

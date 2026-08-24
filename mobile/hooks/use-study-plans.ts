@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { daysUntil, localDay, MONTH_NAMES } from '@/hooks/use-agenda';
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { deleteMedia } from '@/lib/media';
 
 export const STUDY_PLANS_KEY = 'foxy:study-plans';
 
@@ -214,8 +215,12 @@ export function useStudyPlans() {
   );
 
   const removePlan = useCallback(
-    (id: string) => setPlans((prev) => prev.filter((plan) => plan.id !== id)),
-    [setPlans],
+    (id: string) => {
+      const target = plans.find((plan) => plan.id === id);
+      target?.materials.forEach((material) => deleteMedia(material.uri));
+      setPlans((prev) => prev.filter((plan) => plan.id !== id));
+    },
+    [plans, setPlans],
   );
 
   const updatePlan = useCallback(

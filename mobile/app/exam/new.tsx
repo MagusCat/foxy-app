@@ -175,6 +175,9 @@ function PreparingView({
   const [index, setIndex] = useState(0);
   const progress = useRef(new Animated.Value(0)).current;
 
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
   useEffect(() => {
     Animated.timing(progress, {
       toValue: 1,
@@ -187,13 +190,13 @@ function PreparingView({
     const rotate = setInterval(() => {
       setIndex((prev) => Math.min(prev + 1, messages.length - 1));
     }, step);
-    const finish = setTimeout(onDone, durationMs);
+    const finish = setTimeout(() => onDoneRef.current(), durationMs);
 
     return () => {
       clearInterval(rotate);
       clearTimeout(finish);
     };
-  }, [durationMs, messages.length, onDone, progress]);
+  }, [durationMs, messages.length, progress]);
 
   return (
     <View className="flex-1 items-center justify-center px-8">

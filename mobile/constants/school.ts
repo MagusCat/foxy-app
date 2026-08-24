@@ -8,6 +8,8 @@ export type SchoolStage = (typeof SCHOOL_STAGES)[number]['value'];
 
 export const GROUP_OPTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
+export const LEVEL_SKIPPED = 'nd';
+
 export const SHIFTS = [
   { value: 'matutino', label: 'Matutino' },
   { value: 'vespertino', label: 'Vespertino' },
@@ -29,6 +31,8 @@ export const DEFAULT_SCHOOL_PROFILE: SchoolProfile = {
 };
 
 export function describeGrade(profile: SchoolProfile) {
+  if (profile.level === LEVEL_SKIPPED) return '';
+
   if (!profile.stage || !profile.level) return profile.grade || '';
 
   const stage = SCHOOL_STAGES.find((item) => item.value === profile.stage);

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { localDay } from '@/lib/time';
 
 const STORAGE_KEY = 'foxy:events';
 
@@ -10,6 +11,7 @@ export type EventKind = 'examen' | 'tarea' | 'clase' | 'repaso';
 export type AgendaEvent = {
   id: string;
   title: string;
+  description?: string;
   subject: string;
   date: string;
   time?: string;
@@ -33,11 +35,9 @@ export const MONTH_NAMES = [
 
 export const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
-export function localDay(date: Date) {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
+// `localDay` vive en lib/time.ts; se re-exporta aquí para no romper los
+// imports existentes (`import { localDay } from '@/hooks/use-agenda'`).
+export { localDay };
 
 export function daysUntil(day: string, from = new Date()) {
   const target = new Date(`${day}T00:00:00`).getTime();

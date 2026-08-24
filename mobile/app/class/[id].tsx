@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 
 import { useGuardedRouter } from '@/features/shared/hooks/use-guarded-router';
@@ -11,6 +12,7 @@ import { getSubjectAccent } from '@/constants/subject-colors';
 import { Palette } from '@/constants/theme';
 import { useTheme } from '@/contexts/theme-context';
 import { appAlert } from '@/features/shared/components/overlay';
+import { useAttachments } from '@/hooks/use-attachments';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import {
   POST_KIND_META,
@@ -20,6 +22,7 @@ import {
   type ClassPost,
   type ClassPostKind,
 } from '@/hooks/use-classrooms';
+import { persistMedia } from '@/lib/media';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 type Tab = 'tablon' | 'trabajo' | 'personas';
@@ -55,6 +58,14 @@ export default function ClassroomScreen() {
 
   const { room, addPost, removePost, hydrated } = useClassroom(id);
   const [userName] = usePersistentState('foxy:user-name', 'Usuario');
+  const {
+    attachments,
+    addFromCamera,
+    addFromLibrary,
+    addFromFiles,
+    removeAttachment,
+    clearAttachments,
+  } = useAttachments();
 
   const [tab, setTab] = useState<Tab>('tablon');
   const [draft, setDraft] = useState('');
@@ -91,12 +102,31 @@ export default function ClassroomScreen() {
   const homework = posts.filter((post) => post.kind === 'tarea');
   const visiblePosts = tab === 'trabajo' ? homework : posts;
 
+  const selectDraftKind = (kind: ClassPostKind) => {
+    setDraftKind(kind);
+    if (kind !== 'tarea') clearAttachments();
+  };
+
   const publish = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text && attachments.length === 0) return;
 
-    addPost(room.id, { kind: draftKind, author: userName, text });
+    addPost(room.id, {
+      kind: draftKind,
+      author: userName,
+      text,
+      ...(draftKind === 'tarea' && attachments.length > 0
+        ? {
+            attachments: attachments.map((item) => ({
+              kind: item.kind,
+              name: item.name,
+              uri: persistMedia(item.uri, item.kind === 'image' ? 'post-img' : 'post-doc'),
+            })),
+          }
+        : {}),
+    });
     setDraft('');
+    clearAttachments();
     setComposing(false);
   };
 
@@ -274,7 +304,7 @@ export default function ClassroomScreen() {
                         activeOpacity={0.75}
                         accessibilityRole="button"
                         accessibilityState={{ selected: isActive }}
-                        onPress={() => setDraftKind(kind)}
+                        onPress={() => selectDraftKind(kind)}
                       >
                         <Ionicons
                           name={meta.icon}
@@ -300,7 +330,11 @@ export default function ClassroomScreen() {
                     minHeight: 90,
                     textAlignVertical: 'top',
                   }}
-                  placeholder="Escribe algo para tu cuaderno…"
+                  placeholder={
+                    draftKind === 'tarea'
+                      ? 'Describe la tarea… puedes adjuntar archivos'
+                      : 'Escribe algo para tu cuaderno…'
+                  }
                   placeholderTextColor={colors.icon}
                   value={draft}
                   onChangeText={setDraft}
@@ -308,11 +342,105 @@ export default function ClassroomScreen() {
                   autoFocus
                 />
 
+                {draftKind === 'tarea' ? (
+                  <>
+                    <View className="mt-3 flex-row items-center gap-2">
+                      <TouchableOpacity
+                        className="flex-row items-center rounded-full border px-3 py-1.5"
+                        style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel="Adjuntar desde la cámara"
+                        onPress={addFromCamera}
+                      >
+                        <Ionicons name="camera-outline" size={14} color={colors.text} />
+                        <Text className="ml-1.5 text-[12px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                          Cámara
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        className="flex-row items-center rounded-full border px-3 py-1.5"
+                        style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel="Adjuntar desde tus fotos"
+                        onPress={addFromLibrary}
+                      >
+                        <Ionicons name="images-outline" size={14} color={colors.text} />
+                        <Text className="ml-1.5 text-[12px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                          Fotos
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        className="flex-row items-center rounded-full border px-3 py-1.5"
+                        style={{ backgroundColor: colors.background, borderColor: colors.cardBorder }}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel="Adjuntar archivos"
+                        onPress={addFromFiles}
+                      >
+                        <Ionicons name="folder-outline" size={14} color="#FBBF24" />
+                        <Text className="ml-1.5 text-[12px] font-semibold text-text-primary-light dark:text-text-primary-dark">
+                          Archivos
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {attachments.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        className="mt-2 -mx-1"
+                        contentContainerStyle={{ paddingHorizontal: 4, gap: 8 }}
+                      >
+                        {attachments.map((attachment) => (
+                          <View
+                            key={attachment.id}
+                            className="flex-row items-center rounded-xl border border-card-light-border bg-surface-light py-1.5 pl-1.5 pr-1 dark:border-surface-dark-border dark:bg-surface-dark"
+                          >
+                            {attachment.kind === 'image' ? (
+                              <Image
+                                source={{ uri: attachment.uri }}
+                                style={{ height: 28, width: 28, borderRadius: 8 }}
+                                contentFit="cover"
+                                transition={120}
+                              />
+                            ) : (
+                              <View className="h-7 w-7 items-center justify-center rounded-lg bg-card-light dark:bg-card-dark">
+                                <Ionicons name="document-text-outline" size={15} color="#FBBF24" />
+                              </View>
+                            )}
+
+                            <Text
+                              className="mx-1.5 max-w-[130px] text-[11px] font-medium text-text-primary-light dark:text-text-primary-dark"
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                            >
+                              {attachment.name}
+                            </Text>
+
+                            <TouchableOpacity
+                              className="h-6 w-6 items-center justify-center rounded-full"
+                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Quitar ${attachment.name}`}
+                              onPress={() => removeAttachment(attachment.id)}
+                            >
+                              <Ionicons name="close" size={14} color={colors.icon} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    ) : null}
+                  </>
+                ) : null}
+
                 <View className="mt-3 flex-row justify-end gap-2.5">
                   <TouchableOpacity
                     className="rounded-xl px-4 py-2.5"
                     onPress={() => {
                       setDraft('');
+                      clearAttachments();
                       setComposing(false);
                     }}
                   >
@@ -322,8 +450,11 @@ export default function ClassroomScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     className="rounded-xl px-5 py-2.5"
-                    style={{ backgroundColor: accent.color, opacity: draft.trim() ? 1 : 0.45 }}
-                    disabled={!draft.trim()}
+                    style={{
+                      backgroundColor: accent.color,
+                      opacity: draft.trim() || attachments.length > 0 ? 1 : 0.45,
+                    }}
+                    disabled={!draft.trim() && attachments.length === 0}
                     activeOpacity={0.85}
                     accessibilityRole="button"
                     accessibilityLabel="Publicar"
@@ -393,9 +524,19 @@ export default function ClassroomScreen() {
                         <Text className="text-[13px] font-semibold text-text-primary-light dark:text-text-primary-dark">
                           {post.author}
                         </Text>
-                        <Text className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
-                          {meta.label} · {describeMoment(post.at)}
-                        </Text>
+                        <View className="mt-1 flex-row items-center gap-1.5">
+                          <View
+                            className="rounded-full px-2 py-0.5"
+                            style={{ backgroundColor: softTint(meta.color, isDark) }}
+                          >
+                            <Text className="text-[10px] font-bold" style={{ color: meta.color }}>
+                              {meta.label}
+                            </Text>
+                          </View>
+                          <Text className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
+                            {describeMoment(post.at)}
+                          </Text>
+                        </View>
                       </View>
 
                       <TouchableOpacity
@@ -412,6 +553,42 @@ export default function ClassroomScreen() {
                     <Text className="mt-3 text-[14px] leading-[20px] text-text-primary-light dark:text-text-primary-dark">
                       {post.text}
                     </Text>
+
+                    {(post.attachments?.length ?? 0) > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        className="mt-2.5 -mx-1"
+                        contentContainerStyle={{ paddingHorizontal: 4, gap: 8 }}
+                      >
+                        {post.attachments!.map((file) => (
+                          <View
+                            key={file.uri}
+                            className="flex-row items-center rounded-xl border border-card-light-border bg-surface-light py-1.5 pl-1.5 pr-2.5 dark:border-surface-dark-border dark:bg-surface-dark"
+                          >
+                            {file.kind === 'image' ? (
+                              <Image
+                                source={{ uri: file.uri }}
+                                style={{ height: 28, width: 28, borderRadius: 8 }}
+                                contentFit="cover"
+                                transition={120}
+                              />
+                            ) : (
+                              <View className="h-7 w-7 items-center justify-center rounded-lg bg-card-light dark:bg-card-dark">
+                                <Ionicons name="document-text-outline" size={15} color="#FBBF24" />
+                              </View>
+                            )}
+                            <Text
+                              className="ml-1.5 max-w-[150px] text-[11px] font-medium text-text-primary-light dark:text-text-primary-dark"
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                            >
+                              {file.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    ) : null}
                   </View>
                 );
               })

@@ -286,7 +286,7 @@ export default function FocusScreen() {
             </View>
 
             <View className="my-2 items-center">
-              <View className="relative flex-row items-center justify-center">
+              <View className="relative flex-row items-center px-5">
                 <WheelHighlight />
                 <WheelPicker
                   options={CUSTOM_MINUTES}

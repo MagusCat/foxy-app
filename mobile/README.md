@@ -271,8 +271,8 @@ raíz lo apunte.
 
 **`AgendaEvent`** (`hooks/use-agenda.ts`) — título, materia, fecha, hora y
 `kind` (`examen` · `tarea` · `clase` · `repaso`). Aquí viven también
-`localDay`, `daysUntil`, `buildMonthGrid`, `MONTH_NAMES` y `WEEKDAY_LABELS`, que
-usa todo lo que toca fechas.
+`daysUntil`, `buildMonthGrid`, `MONTH_NAMES` y `WEEKDAY_LABELS`, que usa todo lo
+que toca fechas; `localDay` se re-exporta desde `lib/time`.
 
 ## Diseño
 
@@ -319,8 +319,8 @@ Nada usa el `Modal` nativo ni `Alert.alert`. Las hojas inferiores van por
 `AppModal` (`features/shared/components/portal.tsx`), que se superpone dentro
 del mismo árbol de React: en Android, la ventana de sistema aparte dejaba los
 avisos propios detrás y hacía perder el resultado del selector de fotos. El
-fondo entra en fundido y el panel sube deslizando (`SheetSlide`, 260 ms); no
-hay animación de salida. Los diálogos centrados y las hojas compartidas viven
+fondo entra en fundido y el panel sube deslizando (`SheetSlide`, 260 ms); al
+cerrar todo sale en fundido (`FadeOut`, 150 ms). Los diálogos centrados y las hojas compartidas viven
 en `features/shared/components/overlay.tsx`.
 
 Con el teclado ocurre lo descrito arriba: la ventana no se reajusta y el alto
@@ -337,14 +337,16 @@ ventana que se está cerrando.
 ## Utilidades
 
 `lib/media.ts` — `persistMedia` copia lo que devuelven la cámara, la galería y
-el selector de archivos a la carpeta de documentos de la app. El selector los
-deja en una caché que el sistema puede vaciar, así que sin esta copia las
-imágenes guardadas se rompen con el tiempo. `deleteMedia` limpia lo que ya no se
-usa.
+el selector de archivos —incluidos los adjuntos del chat— a la carpeta de
+documentos de la app. El selector los deja en una caché que el sistema puede
+vaciar, así que sin esta copia las imágenes guardadas se rompen con el tiempo.
+`deleteMedia` borra el archivo de un adjunto al eliminar su plan, post o
+conversación; `deleteAllMedia` vacía la carpeta al resetear los datos.
 
 `lib/time.ts` — conversión entre el formato de 24 horas que se guarda y el de 12
-que se muestra: `parseTime`, `toTimeString`, `formatTime12`, y las opciones de
-las ruedas.
+que se muestra: `parseTime`, `toTimeString`, `formatTime12`, las opciones de las
+ruedas y `localDay` (fecha local `YYYY-MM-DD`, fuente única para todo lo que
+agrupa por día).
 
 `constants/subjects.ts` — catálogo base de materias (`DEFAULT_SUBJECTS`) y tres
 ayudantes: `normalizeSubject` (compara sin tildes), `searchSubjects` (filtro

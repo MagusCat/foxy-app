@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { localDay } from '@/lib/time';
 
 const STORAGE_KEY = 'foxy:streak';
 
@@ -47,12 +48,6 @@ export type StreakInfo = {
   daysToMilestone: number;
   hydrated: boolean;
 };
-
-function localDay(date: Date) {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 function parseDay(day: string) {
   return new Date(`${day}T00:00:00`);

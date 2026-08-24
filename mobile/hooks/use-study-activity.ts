@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { localDay } from '@/lib/time';
 
 const STORAGE_KEY = 'foxy:activity-log';
 
@@ -31,12 +32,6 @@ export const STUDY_KIND_META: Record<
 };
 
 const DAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-
-function localDay(date: Date) {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 export type SubjectTotal = {
   subject: string;
@@ -109,9 +104,6 @@ export function useStudyActivity() {
       });
     });
 
-    // Solo el modo enfoque suma minutos a la meta diaria. Las lecciones y
-    // exámenes quedan en el historial con sus minutos, pero no mueven la
-    // meta (doc Parte 6.2): no reintroducir otros kinds aquí.
     sessions.forEach((session) => {
       if (session.kind !== 'focus') return;
       const key = localDay(new Date(session.at));
