@@ -12,19 +12,25 @@ import (
 	"github.com/google/uuid"
 )
 
-// Material types — mirror the materials.type CHECK in the DB
-// (docs/schemas/schema_v2.sql). Adding a type here means editing that CHECK too.
+// Material types — mirror the materials.type CHECK in the DB. Adding one here
+// means editing that CHECK too; contract_test.go falla si divergen.
 const (
 	TypeSummary    = "summary"
 	TypeFlashcards = "flashcards"
 	TypeExam       = "exam"
 	TypeAssignment = "assignment"
 	TypeNotes      = "notes"
+	TypeLessonText = "lesson_text"
+	TypeTrueFalse  = "true_false"
+	TypeExercise   = "exercise"
+	TypeWeakAreas  = "weak_areas"
 )
 
 var validTypes = map[string]bool{
 	TypeSummary: true, TypeFlashcards: true, TypeExam: true,
 	TypeAssignment: true, TypeNotes: true,
+	TypeLessonText: true, TypeTrueFalse: true,
+	TypeExercise: true, TypeWeakAreas: true,
 }
 
 const maxPromptLen = 4000
@@ -32,7 +38,7 @@ const maxPromptLen = 4000
 type Material struct {
 	ID             uuid.UUID       `db:"id" json:"id"`
 	UserID         uuid.UUID       `db:"user_id" json:"user_id"`
-	ZoneID         *uuid.UUID      `db:"zone_id" json:"zone_id"`
+	NotebookID     *uuid.UUID      `db:"notebook_id" json:"notebook_id"`
 	ConversationID *uuid.UUID      `db:"conversation_id" json:"conversation_id"`
 	Type           string          `db:"type" json:"type"`
 	Title          string          `db:"title" json:"title"`
@@ -53,7 +59,7 @@ type Attempt struct {
 // GenerateRequest asks the AI for a new material.
 type GenerateRequest struct {
 	Type           string     `json:"type"`
-	ZoneID         *uuid.UUID `json:"zone_id"`
+	NotebookID     *uuid.UUID `json:"notebook_id"`
 	ConversationID *uuid.UUID `json:"conversation_id"`
 	Title          *string    `json:"title"`
 	Prompt         string     `json:"prompt"`
@@ -102,6 +108,14 @@ func defaultTitle(materialType string) string {
 		return "Tarea"
 	case TypeNotes:
 		return "Apuntes"
+	case TypeLessonText:
+		return "Lección"
+	case TypeTrueFalse:
+		return "Verdadero o falso"
+	case TypeExercise:
+		return "Ejercicio"
+	case TypeWeakAreas:
+		return "Áreas de mejora"
 	default:
 		return "Material"
 	}

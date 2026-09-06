@@ -13,8 +13,8 @@ type Service struct {
 
 func NewService(repo *Repository) *Service { return &Service{repo: repo} }
 
-func (s *Service) List(ctx context.Context, userID uuid.UUID, from, to *time.Time, zoneID *uuid.UUID) ([]Event, error) {
-	return s.repo.List(ctx, userID, from, to, zoneID)
+func (s *Service) List(ctx context.Context, userID uuid.UUID, from, to *time.Time, notebookID *uuid.UUID) ([]Event, error) {
+	return s.repo.List(ctx, userID, from, to, notebookID)
 }
 
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateEventRequest) (*Event, error) {

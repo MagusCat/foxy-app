@@ -1,4 +1,4 @@
-package zones
+package notebooks
 
 import "testing"
 

@@ -1,4 +1,4 @@
-package zones
+package notebooks
 
 import (
 	"context"
@@ -22,13 +22,13 @@ const (
 	joinCodeLen       = 6       // characters in a join code
 )
 
-func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Zone, error) {
+func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Notebook, error) {
 	return s.repo.List(ctx, userID)
 }
 
-// Create generates a unique join code when the zone is collaborative, retrying if
+// Create generates a unique join code when the notebook is collaborative, retrying if
 // it collides with an existing one (extremely rare with 32^6 combinations).
-func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateZoneRequest) (*Zone, error) {
+func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateNotebookRequest) (*Notebook, error) {
 	for attempt := 0; attempt < joinCodeRetries; attempt++ {
 		var code *string
 		if req.IsCollaborative {
@@ -48,36 +48,36 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateZoneRe
 	return nil, apperr.Internal(errors.New("could not generate a unique join code"))
 }
 
-func (s *Service) Get(ctx context.Context, userID, zoneID uuid.UUID) (*Zone, error) {
-	return s.repo.Get(ctx, userID, zoneID)
+func (s *Service) Get(ctx context.Context, userID, notebookID uuid.UUID) (*Notebook, error) {
+	return s.repo.Get(ctx, userID, notebookID)
 }
 
-func (s *Service) Update(ctx context.Context, userID, zoneID uuid.UUID, req UpdateZoneRequest) (*Zone, error) {
-	return s.repo.Update(ctx, userID, zoneID, req)
+func (s *Service) Update(ctx context.Context, userID, notebookID uuid.UUID, req UpdateNotebookRequest) (*Notebook, error) {
+	return s.repo.Update(ctx, userID, notebookID, req)
 }
 
-func (s *Service) Delete(ctx context.Context, userID, zoneID uuid.UUID) error {
-	return s.repo.Delete(ctx, userID, zoneID)
+func (s *Service) Delete(ctx context.Context, userID, notebookID uuid.UUID) error {
+	return s.repo.Delete(ctx, userID, notebookID)
 }
 
-func (s *Service) Join(ctx context.Context, userID uuid.UUID, code string) (*Zone, error) {
+func (s *Service) Join(ctx context.Context, userID uuid.UUID, code string) (*Notebook, error) {
 	return s.repo.JoinByCode(ctx, userID, code)
 }
 
-func (s *Service) Leave(ctx context.Context, userID, zoneID uuid.UUID) error {
-	return s.repo.Leave(ctx, userID, zoneID)
+func (s *Service) Leave(ctx context.Context, userID, notebookID uuid.UUID) error {
+	return s.repo.Leave(ctx, userID, notebookID)
 }
 
-func (s *Service) Members(ctx context.Context, userID, zoneID uuid.UUID) ([]Member, error) {
-	return s.repo.Members(ctx, userID, zoneID)
+func (s *Service) Members(ctx context.Context, userID, notebookID uuid.UUID) ([]Member, error) {
+	return s.repo.Members(ctx, userID, notebookID)
 }
 
-func (s *Service) ListObjectives(ctx context.Context, userID, zoneID uuid.UUID) ([]Objective, error) {
-	return s.repo.ListObjectives(ctx, userID, zoneID)
+func (s *Service) ListObjectives(ctx context.Context, userID, notebookID uuid.UUID) ([]Objective, error) {
+	return s.repo.ListObjectives(ctx, userID, notebookID)
 }
 
-func (s *Service) CreateObjective(ctx context.Context, userID, zoneID uuid.UUID, req CreateObjectiveRequest) (*Objective, error) {
-	return s.repo.CreateObjective(ctx, userID, zoneID, req)
+func (s *Service) CreateObjective(ctx context.Context, userID, notebookID uuid.UUID, req CreateObjectiveRequest) (*Objective, error) {
+	return s.repo.CreateObjective(ctx, userID, notebookID, req)
 }
 
 func (s *Service) UpdateObjective(ctx context.Context, userID, objID uuid.UUID, req UpdateObjectiveRequest) (*Objective, error) {

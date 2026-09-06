@@ -6,6 +6,7 @@ import (
 	"github.com/foxy-app/backend/internal/platform/apperr"
 	"github.com/foxy-app/backend/internal/platform/dbx"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,6 +36,34 @@ func (r *Repository) Get(ctx context.Context, userID, id uuid.UUID) (*Attachment
 		return nil, apperr.Internal(err)
 	}
 	return dbx.One[Attachment](rows)
+}
+
+// visibleLimit bounds how many attachments the AI search can span.
+const visibleLimit = 50
+
+// VisibleIDs returns the attachments whose text the AI may search for this user:
+// the ones in this conversation plus the ones in this notebook. Authorization
+// lives here and only here; the ai-service searches inside the ids it is given
+// and decides nothing.
+func (r *Repository) VisibleIDs(ctx context.Context, userID uuid.UUID, notebookID, convID *uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx,
+		`select a.id from attachments a
+		 left join conversations c on c.id = a.conversation_id
+		 where a.user_id = $1
+		   and a.processing_status = 'ready'
+		   and (($2::uuid is not null and a.conversation_id = $2)
+		     or ($3::uuid is not null and c.notebook_id = $3))
+		 order by a.created_at desc
+		 limit $4`,
+		userID, convID, notebookID, visibleLimit)
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	return ids, nil
 }
 
 func (r *Repository) SetExtracted(ctx context.Context, id uuid.UUID, text, status string) error {

@@ -17,31 +17,39 @@ type Repository struct {
 
 func NewRepository(pool *pgxpool.Pool) *Repository { return &Repository{pool: pool} }
 
-const materialCols = `id, user_id, zone_id, conversation_id, type, title, content, created_at`
+const materialCols = `id, user_id, notebook_id, conversation_id, type, title, content, created_at`
 const attemptCols = `id, material_id, user_id, started_at, submitted_at, score, answers`
 
-func (r *Repository) Insert(ctx context.Context, userID uuid.UUID, zoneID, convID *uuid.UUID, mType, title string, content json.RawMessage) (*Material, error) {
+// Insert only accepts a notebook the user belongs to and a conversation they own, so
+// a generated material cannot be filed into somebody else's notebook or thread. Same
+// shape as events.Repository.Create: the checks ride in the INSERT.
+func (r *Repository) Insert(ctx context.Context, userID uuid.UUID, notebookID, convID *uuid.UUID, mType, title string, content json.RawMessage) (*Material, error) {
 	rows, err := r.pool.Query(ctx,
-		`insert into materials (user_id, zone_id, conversation_id, type, title, content)
-		 values ($1,$2,$3,$4,$5,$6) returning `+materialCols,
-		userID, zoneID, convID, mType, title, content)
+		`insert into materials (user_id, notebook_id, conversation_id, type, title, content)
+		 select $1, $2, $3, $4, $5, $6
+		 where ($2::uuid is null
+		     or exists(select 1 from notebook_members m where m.notebook_id = $2 and m.user_id = $1))
+		   and ($3::uuid is null
+		     or exists(select 1 from conversations c where c.id = $3 and c.user_id = $1))
+		 returning `+materialCols,
+		userID, notebookID, convID, mType, title, content)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return dbx.One[Material](rows)
 }
 
-func (r *Repository) List(ctx context.Context, userID uuid.UUID, zoneID *uuid.UUID, mType *string, c *page.Cursor, limit int) ([]Material, string, error) {
+func (r *Repository) List(ctx context.Context, userID uuid.UUID, notebookID *uuid.UUID, mType *string, c *page.Cursor, limit int) ([]Material, string, error) {
 	ct, cid := c.Args()
 	rows, err := r.pool.Query(ctx,
 		`select `+materialCols+` from materials
 		 where user_id = $1
-		   and ($2::uuid is null or zone_id = $2)
+		   and ($2::uuid is null or notebook_id = $2)
 		   and ($3::text is null or type = $3)
 		   and ($4::timestamptz is null or (created_at, id) < ($4, $5))
 		 order by created_at desc, id desc
 		 limit $6`,
-		userID, zoneID, mType, ct, cid, limit+1)
+		userID, notebookID, mType, ct, cid, limit+1)
 	if err != nil {
 		return nil, "", apperr.Internal(err)
 	}

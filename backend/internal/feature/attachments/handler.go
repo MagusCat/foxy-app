@@ -1,16 +1,24 @@
 package attachments
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/foxy-app/backend/internal/platform/httpx"
+	"github.com/google/uuid"
 )
 
-type Handler struct {
-	svc *Service
+type service interface {
+	CreateUploadURL(ctx context.Context, userID uuid.UUID, req UploadURLRequest) (*UploadTarget, error)
+	Register(ctx context.Context, userID uuid.UUID, req RegisterRequest) (*Attachment, error)
+	Get(ctx context.Context, userID, id uuid.UUID) (*Attachment, error)
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+type Handler struct {
+	svc service
+}
+
+func NewHandler(svc service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Routes() []httpx.Route {
 	s := h.svc

@@ -36,6 +36,10 @@ func (s *Service) ListProfessions(ctx context.Context) ([]Profession, error) {
 	return s.repo.ListProfessions(ctx)
 }
 
+func (s *Service) ListSubjects(ctx context.Context, userID uuid.UUID) ([]Subject, error) {
+	return s.repo.ListSubjects(ctx, userID)
+}
+
 func (s *Service) CreateProfession(ctx context.Context, name string) (*Profession, error) {
 	name = strings.TrimSpace(name)
 	return s.repo.UpsertProfession(ctx, slugify(name), name)

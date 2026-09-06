@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -18,11 +19,12 @@ func TestUpdateProfileValidate(t *testing.T) {
 	}{
 		{"empty is valid (PATCH)", UpdateProfileRequest{}, false},
 		{"display_name too long", UpdateProfileRequest{DisplayName: &long}, true},
-		{"time out of range", UpdateProfileRequest{StudyTimeAvgMin: ptr(4)}, true},
-		{"valid time", UpdateProfileRequest{StudyTimeAvgMin: ptr(45)}, false},
-		{"invalid academic_level enum", UpdateProfileRequest{AcademicLevel: ptr("colegio")}, true},
-		{"valid academic_level enum", UpdateProfileRequest{AcademicLevel: ptr("universidad")}, false},
+		{"invalid academic_level", UpdateProfileRequest{AcademicLevel: ptr("colegio")}, true},
+		{"valid academic_level", UpdateProfileRequest{AcademicLevel: ptr("universidad")}, false},
+		{"new academic_level primaria", UpdateProfileRequest{AcademicLevel: ptr("primaria")}, false},
 		{"invalid user_kind enum", UpdateProfileRequest{UserKind: ptr("robot")}, true},
+		{"invalid preferences json", UpdateProfileRequest{Preferences: json.RawMessage("{bad")}, true},
+		{"valid preferences json", UpdateProfileRequest{Preferences: json.RawMessage(`{"style":"pasos"}`)}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -8,12 +8,17 @@ import (
 )
 
 type CreateConversationRequest struct {
-	ZoneID *uuid.UUID `json:"zone_id"`
-	Title  *string    `json:"title"`
+	NotebookID *uuid.UUID `json:"notebook_id"`
+	SubjectID  *int16     `json:"subject_id"`
+	Kind       string     `json:"kind"`
+	Title      *string    `json:"title"`
 }
 
 func (r CreateConversationRequest) Validate() error {
 	v := apperr.NewValidation()
+	if r.Kind != "" && !convKinds[r.Kind] {
+		v.Add("kind", "debe ser ai o group")
+	}
 	if r.Title != nil && len(*r.Title) > 200 {
 		v.Add("title", "máximo 200 caracteres")
 	}
@@ -21,7 +26,8 @@ func (r CreateConversationRequest) Validate() error {
 }
 
 type SendMessageRequest struct {
-	Content string `json:"content"`
+	Content string  `json:"content"`
+	Mode    *string `json:"mode"`
 }
 
 func (r SendMessageRequest) Validate() error {
@@ -31,5 +37,14 @@ func (r SendMessageRequest) Validate() error {
 	} else if len(c) > 8000 {
 		v.Add("content", "máximo 8000 caracteres")
 	}
+	if r.Mode != nil && !msgModes[*r.Mode] {
+		v.Add("mode", "debe ser respuesta, pasos o quiz")
+	}
 	return v.Err()
 }
+
+type SetSavedRequest struct {
+	Saved bool `json:"saved"`
+}
+
+func (r SetSavedRequest) Validate() error { return nil }

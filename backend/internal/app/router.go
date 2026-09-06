@@ -10,9 +10,9 @@ import (
 	"github.com/foxy-app/backend/internal/feature/chat"
 	"github.com/foxy-app/backend/internal/feature/events"
 	"github.com/foxy-app/backend/internal/feature/materials"
+	"github.com/foxy-app/backend/internal/feature/notebooks"
 	"github.com/foxy-app/backend/internal/feature/profile"
 	"github.com/foxy-app/backend/internal/feature/topics"
-	"github.com/foxy-app/backend/internal/feature/zones"
 	"github.com/foxy-app/backend/internal/platform/aiclient"
 	"github.com/foxy-app/backend/internal/platform/auth"
 	"github.com/foxy-app/backend/internal/platform/config"
@@ -23,24 +23,30 @@ import (
 )
 
 // newRouter wires every domain module (repository -> service -> handler) and
-// mounts its routes under /api/v1 with the middleware chain.
-func newRouter(cfg *config.Config, pool *pgxpool.Pool, authr *auth.Authenticator) http.Handler {
+// mounts its routes under /api/v1 with the middleware chain. The returned func
+// releases what the modules own in the background; Run calls it after Shutdown.
+func newRouter(cfg *config.Config, pool *pgxpool.Pool, authr *auth.Authenticator) (http.Handler, func()) {
 	storageClient := storage.New(cfg.SupabaseURL, cfg.SupabaseServiceKey, cfg.StorageBucket)
-	ai := aiclient.New(cfg.AIServiceURL)
+	ai := aiclient.New(cfg.AIServiceURL, cfg.AIServiceToken)
 
 	profileSvc := profile.NewService(profile.NewRepository(pool))
+	attachmentRepo := attachments.NewRepository(pool)
+	attachmentSvc := attachments.NewService(attachmentRepo, storageClient, ai)
 	modules := [][]httpx.Route{
 		profile.NewHandler(profileSvc).Routes(),
-		zones.NewHandler(zones.NewService(zones.NewRepository(pool))).Routes(),
-		chat.NewHandler(chat.NewService(chat.NewRepository(pool), ai, profileSvc.RecordActivity, cfg.FoxySystemPrompt)).Routes(),
-		attachments.NewHandler(attachments.NewService(attachments.NewRepository(pool), storageClient, ai)).Routes(),
-		materials.NewHandler(materials.NewService(materials.NewRepository(pool), ai)).Routes(),
+		notebooks.NewHandler(notebooks.NewService(notebooks.NewRepository(pool))).Routes(),
+		chat.NewHandler(chat.NewService(chat.NewRepository(pool), ai, profileSvc.RecordActivity, attachmentRepo.VisibleIDs)).Routes(),
+		attachments.NewHandler(attachmentSvc).Routes(),
+		materials.NewHandler(materials.NewService(materials.NewRepository(pool), ai, attachmentRepo.VisibleIDs)).Routes(),
 		events.NewHandler(events.NewService(events.NewRepository(pool))).Routes(),
 		topics.NewHandler(topics.NewService(topics.NewRepository(pool))).Routes(),
 	}
 
 	rl := middleware.NewRateLimiter(cfg.RateLimitPerMinute, cfg.RateLimitBurst)
 	timeout := middleware.Timeout(cfg.RequestTimeout)
+	// Shared across every streaming route: the ceiling is the process's, not each
+	// endpoint's, because they all end up waiting on the same ai-service.
+	streamCap := middleware.MaxConcurrent(cfg.MaxConcurrentStreams)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(http.MethodGet+" /health", health(pool))
@@ -50,7 +56,9 @@ func newRouter(cfg *config.Config, pool *pgxpool.Pool, authr *auth.Authenticator
 			if rt.Paid {
 				mws = append(mws, rl.Middleware)
 			}
-			if !rt.Stream {
+			if rt.Stream {
+				mws = append(mws, streamCap) // no timeout here, so bound the count instead
+			} else {
 				mws = append(mws, timeout) // SSE is exempt: the streaming is long on purpose
 			}
 			mux.Handle(rt.Method+" /api/v1"+rt.Pattern, middleware.Chain(rt.Handler, mws...))
@@ -58,8 +66,9 @@ func newRouter(cfg *config.Config, pool *pgxpool.Pool, authr *auth.Authenticator
 	}
 
 	// Global middleware (the first is the outermost).
-	return middleware.Chain(mux,
+	handler := middleware.Chain(mux,
 		middleware.Recover, middleware.RequestID, middleware.Logger, middleware.CORS(cfg.AllowedOrigins))
+	return handler, attachmentSvc.Close
 }
 
 // health reports DB reachability. No auth: it's used by health checks.

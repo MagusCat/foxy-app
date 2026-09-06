@@ -1,23 +1,16 @@
 # Arquitectura del backend (Go)
 
-Este documento explica cómo está organizado el backend, qué hace cada carpeta y
-cómo viaja una petición de punta a punta.
-
----
-
-## 1. El sistema en una imagen
-
 ```
-┌─────────────┐     HTTPS/JSON      ┌──────────────────┐     HTTP      ┌──────────────┐
-│ App móvil   │ ──── Bearer JWT ──▶ │  Backend Go      │ ───────────▶ │  ai-service  │
-│ (RN/Expo)   │ ◀─── envelope ───── │  (este repo)     │ ◀─ SSE/JSON  │  (Python)    │
-└─────────────┘                     └───────┬──────────┘               └──────────────┘
-      │                                     │ pgx (service_role)
-      │ sube binario directo                ▼
-      │ a signed URL              ┌──────────────────┐
-      └─────────────────────────▶ │ Supabase         │
-                                  │ Postgres · Auth  │
-                                  │ · Storage        │
+┌─────────────┐      HTTPS/JSON     ┌──────────────────┐   HTTP       ┌──────────────┐
+│ App móvil   │ ─── Bearer JWT ──▶  │  Backend Go      │ ──────────▶  │  ai-service  │
+│ (RN/Expo)   │ ◀── envelope ─────  │  (este repo)     │ ◀─ SSE/JSON  │  (Python)    │
+└─────────────┘                     └───────┬──────────┘              └──────┬───────┘
+      │                                     │ pgx (service_role)             │
+      │ sube binario directo                ▼                                │
+      │ a signed URL              ┌──────────────────┐                       │
+      └─────────────────────────▶ │ Supabase         │ ◀─────────────────────┘
+                                  │ Postgres · Auth  │   document_chunks
+                                  │ · Storage        │   Storage (solo lectura)
                                   └──────────────────┘
 ```
 
@@ -26,10 +19,13 @@ cómo viaja una petición de punta a punta.
   valida con la llave pública (JWKS) y saca el `user_id` del claim `sub`.
 - Los archivos no pasan por el backend. Go firma una URL y el móvil sube el
   binario directo a Storage.
+- El `ai-service` es el único que toca `document_chunks` (embeddings) y el que
+  lee los binarios de Storage para extraer su texto. No decide permisos: Go le
+  entrega los ids de adjuntos ya autorizados y él busca solo dentro de esos.
 
 ---
 
-## 2. Las dos raíces: `platform/` y `feature/`
+## Las dos raíces: `platform/` y `feature/`
 
 ```
 internal/
@@ -45,7 +41,7 @@ infraestructura queda estable.
 
 ---
 
-## 3. `app/` — el arranque
+## `app/` — el arranque
 
 | Archivo | Qué hace |
 |---|---|
@@ -56,7 +52,7 @@ infraestructura queda estable.
 
 ---
 
-## 4. `platform/` — la infraestructura
+## `platform/` — la infraestructura
 
 | Paquete | Responsabilidad |
 |---|---|
@@ -69,12 +65,12 @@ infraestructura queda estable.
 | `dbx` | Helpers de colección de filas con `pgx` (`One`, `Many`): centralizan el mapeo `ErrNoRows → NotFound`. |
 | `page` | Cursor keyset compartido (paginación estable que no se degrada al crecer). |
 | `storage` | Firma URLs de subida de Supabase Storage. |
-| `aiclient` | Cliente HTTP hacia el `ai-service`, incluyendo streaming SSE y un modo stub para desarrollar sin él. |
+| `aiclient` | Cliente HTTP hacia el `ai-service`: streaming SSE, generación de material, extracción de texto, secreto compartido y propagación del request-id. Trae un modo stub para desarrollar sin él. |
 | `dbtest` | Setup compartido de los tests de integración (siembra usuarios, limpia). Solo lo usan los `_test.go`. |
 
 ---
 
-## 5. `feature/` — los dominios
+## `feature/` — los dominios
 
 Cada paquete tiene las mismas piezas, y cada capa solo conoce a la de abajo:
 
@@ -93,33 +89,75 @@ handler.go      Declara las rutas (Routes()) y adapta HTTP↔service vía httpx.
 | `profile` | Perfil del usuario, racha de estudio, catálogo de profesiones. |
 | `zones` | Zonas de estudio (personales o colaborativas), miembros, join por código, objetivos y progreso. |
 | `chat` | Conversaciones, mensajes, historial paginado y respuesta de IA por SSE. |
-| `attachments` | Registro de archivos subidos a Storage y disparo de la extracción de texto. |
+| `attachments` | Registro de archivos subidos a Storage y disparo de la extracción de texto, en un pool acotado de workers que el apagado ordenado espera. |
 | `materials` | Material generado por IA (resumen, flashcards, examen, tarea, apuntes) e intentos de examen. |
 | `events` | Agenda/calendario: clases, exámenes, entregas, sesiones, recordatorios. |
 | `topics` | Temas que organizan una zona de estudio. |
 
 ### El system prompt del chat
 
-La persona de Foxy vive en archivos, no en código, bajo
-`internal/feature/chat/prompts/` (embebidos con `go:embed`):
+**Go no redacta prompts.** Todos —la persona de Foxy, las instrucciones de
+citado y el formato del material generado— viven en un único fichero del
+ai-service, `ai-service/app/prompts.toml`, y se cargan al arrancar:
 
 ```
-prompts/
-  base.md          persona común
-  student.md       enfoque para estudiante
-  teacher.md       enfoque para docente
-  professional.md  enfoque para profesional
+[persona]        persona común
+[persona.kind]   una por user_kind: student, teacher, professional
+[context]        plantillas para el perfil que manda Go, con {value}
+[chat]           cuándo y cómo citar el material
+[materials]      formato JSON exigido por cada tipo de material
 ```
 
-El prompt final se compone así: `base` (o el override de `FOXY_SYSTEM_PROMPT`)
-+ el archivo del `user_kind` del perfil + el contexto del usuario (nivel
-académico, objetivo, objetivos de la zona, texto de sus documentos y sus
-`custom_instructions`). Para cambiar el tono de Foxy se editan esos `.md`, sin
-tocar código; `FOXY_SYSTEM_PROMPT` sobreescribe solo el `base` en runtime.
+El prompt final se compone en `app/prompts.py`: persona base + el
+bloque del `user_kind` + un fragmento por cada dato del perfil que haya llegado
+(nivel académico, meta, minutos de estudio, objetivos de la zona y sus
+`custom_instructions`), siempre en el mismo orden. Cambiar el tono de Foxy es
+editar el TOML; `PROMPTS_FILE` apunta a otra copia para probar variantes sin
+reconstruir la imagen.
+
+Están en el ai-service, y no en Go, porque son acoplamiento con el modelo (el
+`json_mode` de DeepSeek exige la palabra "json" en el prompt) y porque es el
+único servicio que puede evaluarlos contra un LLM. Go conserva lo que sí es
+suyo: los datos y la autorización.
+
+**El orden del prompt es una decisión de coste, no de estilo.** Los proveedores
+cachean por prefijo exacto, así que va lo estable delante —persona, perfil,
+historial, que solo crece por el final— y lo volátil al final: el material
+recuperado se pega al último turno del usuario. Puesto en el `system`, como
+estaba, cualquier cambio en los fragmentos invalidaba toda la conversación que
+venía detrás. `system_for` es determinista y de orden fijo justamente por esto;
+hay un test que lo sostiene.
+
+### El reparto del contexto con el ai-service
+
+El texto de los documentos NO viaja en este prompt. Go manda el perfil en crudo
+(`aiclient.ChatContext`, sin redactar) y la lista de `attachment_id` que ese usuario puede ver
+(`attachments.Repository.VisibleIDs`: los de la conversación más los de la zona,
+siempre con `user_id` en el `WHERE`); el `ai-service` busca por similitud en
+`document_chunks` y anexa los fragmentos relevantes.
+
+| Pieza del prompt | Dueño | Fuente |
+|---|---|---|
+| Persona y variante por `user_kind` | ai-service | `app/prompts.toml` |
+| Redacción del prompt a partir del perfil | ai-service | `app/prompts.py` |
+| Perfil (datos): nivel, meta, minutos, instrucciones propias | Go | `profiles` |
+| Objetivos de la zona | Go | `study_zone_objectives` |
+| Historial reciente (20 mensajes) | Go | `messages` |
+| Fragmentos del material subido, con el archivo del que salieron | ai-service | `document_chunks` |
+
+Go manda también el `file_name` del adjunto al extraer. El ai-service lo guarda
+con cada fragmento, lo rotula en el prompt y así la respuesta puede decir de qué
+archivo sacó cada dato. El `storage_path` no sirve para eso: `storage.sanitize`
+le quita acentos y espacios al nombre.
+
+El motivo del reparto: la autorización es de Go, que es quien conoce membresías
+y propiedad; la recuperación semántica es del ai-service, que es quien tiene el
+modelo de embeddings. Recortar el texto a 6000 caracteres, como se hacía antes,
+descartaba casi todo un PDF largo sin garantía de conservar lo relevante.
 
 ---
 
-## 6. El viaje de una petición
+## El viaje de una petición
 
 Ejemplo: `PATCH /api/v1/me` con `Authorization: Bearer <jwt>`.
 
@@ -130,6 +168,8 @@ Ejemplo: `PATCH /api/v1/me` con `Authorization: Bearer <jwt>`.
 4. cors           cabeceras CORS
 5. auth           valida el JWT, mete el user_id en el context (401 si falla)
 6. rate-limit     (solo endpoints de IA)
+7. stream-cap     (solo rutas SSE) techo de streams simultáneos del proceso;
+                  esas rutas no llevan WriteTimeout, así que nada más las acota
    ── handler ──  httpx.Decode: corta el body a 1 MB, rechaza campos desconocidos,
                   corre Validate(). Extrae el user_id del context.
    ── service ──  aplica la regla de negocio
@@ -144,57 +184,35 @@ El handler nunca escribe el status a mano: un error de dominio se mapea solo
 
 ---
 
-## 7. El modelo de seguridad (léelo)
+### Cómo se autentican los dos servicios entre sí
 
-El backend se conecta con `service_role`, que hace bypass de RLS. Eso
-significa que Postgres no te protege: la autorización vive en el código.
+Ese secreto **no viaja**: es la clave con la que Go firma un JWT (HS256) para
+cada llamada al ai-service.
 
-- Contrato invariable: todo repository recibe el `userID` y lo mete en el
-  `WHERE`. Un `GET /zones/{id}` de un recurso ajeno devuelve 404 (no 403), para
-  no filtrar siquiera que existe.
-- La red que lo sostiene: cada repository tiene un `TestForeignUserGets404`
-  que lo verifica contra una DB real. Si algún día un query olvida el `WHERE`, ese
-  test se pone rojo.
-- RLS habilitada sin policies en la DB, a propósito: cierra la puerta de
-  PostgREST directo. Añadir una policy permisiva abriría un agujero, no lo
-  cerraría.
-- Permisos de app (admin/auditor) salen de `profiles.system_role`, nunca del
-  claim `role` del JWT (que el usuario no puede modificar, pero tampoco usamos).
+```
+iss  foxy-backend        aud  foxy-ai-service
+sub  <user_id>           jti  <request_id>
+exp  ahora + 5 min       scope  chat | generate | extract
+```
 
-> Techo consciente: el rate-limit y este modelo asumen una sola instancia. Si
-> se escala horizontalmente, el rate-limit va a Redis y, si aparece multi-tenant
-> real, se migra a propagar el JWT con `SET LOCAL request.jwt.claims` y dejar que
-> mande la RLS.
+Lo que compra cada campo:
+
+| Campo | Qué evita |
+|---|---|
+| `exp` | Que una fuga sea acceso permanente. Antes el bearer era fijo y revocarlo obligaba a redesplegar los dos servicios |
+| `scope` | Que un token emitido para conversar sirva contra `/v1/extract`, el único endpoint que lee todo el bucket con la service key |
+| `sub` | Atribuir a un usuario lo que ocurre en el ai-service, incluido el gasto en tokens |
+| `aud` / `iss` | Que un token de otro sistema con la misma clave valga aquí |
 
 ---
 
-## 8. Dependencias externas y su estado
+## Dependencias externas y su estado
 
 | Dependencia | Para qué | Si no está |
 |---|---|---|
 | Postgres (Supabase) | Toda la persistencia | El backend no arranca (`Ping` falla). |
 | Supabase Auth (JWKS) | Validar el JWT | 401 en todo lo autenticado. |
-| `ai-service` (Python) | Chat IA, generar material, extraer texto | Con `AI_SERVICE_URL=stub` responde de ejemplo; sin stub ni servicio → 502 en esos endpoints. |
+| `ai-service` (Python) | Chat IA, generar material, extraer texto e indexar/buscar el contexto documental | Con `AI_SERVICE_URL=stub` responde de ejemplo; sin stub ni servicio → 502 en esos endpoints. El chat sigue funcionando sin contexto documental si la búsqueda falla. |
 | Supabase Storage | Subida de archivos | `/attachments/upload-url` falla al firmar. |
 
-Límite duro de subidas: el `size_bytes`/`mime_type` que valida el backend es
-una comprobación de borde (rechaza lo obviamente inválido con un 400 temprano);
-una URL firmada no puede impedir que el cliente suba un archivo mayor o distinto.
-El tope real se configura en el bucket de Supabase (`file_size_limit` +
-`allowed_mime_types`). Configúralo al crear el bucket `attachments`.
-
 ---
-
-## 9. Estrategia de pruebas
-
-- Unitarias (sin DB, siempre corren): `Validate()` de cada request, el
-  constructor de prompt del chat, el cursor keyset, el mapeo error→status.
-- Integración (con DB real, `_test.go` que se saltan sin `DATABASE_URL`): el
-  `TestForeignUserGets404` por repository. `materials` además inserta cada tipo
-  válido para cazar cualquier deriva entre `validTypes` y el CHECK de la DB.
-
-```bash
-cd backend
-go test ./...                                 # solo unitarias
-set -a && . ./.env && set +a && go test ./...    # + integración
-```

@@ -1,4 +1,19 @@
--- Foxy — schema v2. dbdiagram.io: New diagram -> Import -> PostgreSQL.
+-- Foxy schema v2. Replaces the v1 schema wholesale: the database was empty
+-- (0 auth users, 0 rows) except for the professions seed, so there is nothing
+-- to migrate over. Superseded by 20260904140000_schema_v3.sql; kept as applied history.
+
+-- ── Drop v1 ──────────────────────────────────────────────────────────
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.join_study_zone(text, uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.join_study_zone(text) CASCADE;
+DROP FUNCTION IF EXISTS private.is_zone_member(uuid) CASCADE;
+
+DROP TABLE IF EXISTS exam_attempts, materials, attachments, messages,
+  conversations, objective_progress, study_zone_objectives,
+  study_zone_members, study_zones, profiles, professions CASCADE;
+
+DROP TYPE IF EXISTS material_type, system_role, message_role, processing_status CASCADE;
 
 -- ─────────────────────────────── Enums ───────────────────────────────
 CREATE TYPE system_role AS ENUM ('user', 'admin', 'auditor');
@@ -232,3 +247,39 @@ COMMENT ON TABLE events IS 'User calendar.';
 COMMENT ON COLUMN events.zone_id IS 'NULL is private, set means the whole zone sees it. There is no is_shared column.';
 COMMENT ON COLUMN events.material_id IS 'Exam or assignment this is the deadline for; keeps the calendar a single-table query.';
 COMMENT ON COLUMN events.starts_at IS 'Due date when material_id is set.';
+
+-- ─────────────────────── Profile bootstrap ───────────────────────────
+-- Supabase Auth is the only writer of auth.users; this keeps profiles in sync.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, display_name)
+  VALUES (new.id, coalesce(new.raw_user_meta_data ->> 'full_name', new.email));
+  RETURN new;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ─────────────────────────── Seed ────────────────────────────────────
+-- Starter catalog: fields of study or work. The v1 rows (student/teacher/
+-- engineer/other) were user kinds, not professions, and now live in user_kind.
+INSERT INTO professions (slug, name) VALUES
+  ('ing-sistemas',    'Ingeniería en Sistemas'),
+  ('ing-industrial',  'Ingeniería Industrial'),
+  ('ing-civil',       'Ingeniería Civil'),
+  ('medicina',        'Medicina'),
+  ('enfermeria',      'Enfermería'),
+  ('derecho',         'Derecho'),
+  ('administracion',  'Administración'),
+  ('contaduria',      'Contaduría'),
+  ('psicologia',      'Psicología'),
+  ('diseno-grafico',  'Diseño Gráfico'),
+  ('docencia',        'Docencia'),
+  ('otro',            'Otro');
