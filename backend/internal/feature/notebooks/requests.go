@@ -1,4 +1,4 @@
-package zones
+package notebooks
 
 import (
 	"strings"
@@ -6,13 +6,13 @@ import (
 	"github.com/foxy-app/backend/internal/platform/apperr"
 )
 
-type CreateZoneRequest struct {
-	Name            string  `json:"name"`
-	Subject         *string `json:"subject"`
-	IsCollaborative bool    `json:"is_collaborative"`
+type CreateNotebookRequest struct {
+	Name            string `json:"name"`
+	SubjectID       *int16 `json:"subject_id"`
+	IsCollaborative bool   `json:"is_collaborative"`
 }
 
-func (r CreateZoneRequest) Validate() error {
+func (r CreateNotebookRequest) Validate() error {
 	v := apperr.NewValidation()
 	if n := strings.TrimSpace(r.Name); n == "" || len(n) > 100 {
 		v.Add("name", "requerido, máximo 100 caracteres")
@@ -20,12 +20,12 @@ func (r CreateZoneRequest) Validate() error {
 	return v.Err()
 }
 
-type UpdateZoneRequest struct {
-	Name    *string `json:"name"`
-	Subject *string `json:"subject"`
+type UpdateNotebookRequest struct {
+	Name      *string `json:"name"`
+	SubjectID *int16  `json:"subject_id"`
 }
 
-func (r UpdateZoneRequest) Validate() error {
+func (r UpdateNotebookRequest) Validate() error {
 	v := apperr.NewValidation()
 	if r.Name != nil && (strings.TrimSpace(*r.Name) == "" || len(*r.Name) > 100) {
 		v.Add("name", "no puede ser vacío, máximo 100 caracteres")
@@ -33,11 +33,11 @@ func (r UpdateZoneRequest) Validate() error {
 	return v.Err()
 }
 
-type JoinZoneRequest struct {
+type JoinNotebookRequest struct {
 	Code string `json:"code"`
 }
 
-func (r JoinZoneRequest) Validate() error {
+func (r JoinNotebookRequest) Validate() error {
 	v := apperr.NewValidation()
 	if strings.TrimSpace(r.Code) == "" {
 		v.Add("code", "requerido")

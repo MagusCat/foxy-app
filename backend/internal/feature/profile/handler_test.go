@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -26,6 +27,9 @@ func (f fakeService) ListProfessions(context.Context) ([]Profession, error) { re
 func (f fakeService) CreateProfession(context.Context, string) (*Profession, error) {
 	return nil, f.err
 }
+func (f fakeService) ListSubjects(context.Context, uuid.UUID) ([]Subject, error) {
+	return nil, f.err
+}
 
 func reqWithUser(id uuid.UUID) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
@@ -41,6 +45,55 @@ func meHandler(h *Handler) http.HandlerFunc {
 		}
 	}
 	panic("GET /me route not found")
+}
+
+func route(t *testing.T, h *Handler, method, pattern string) http.HandlerFunc {
+	t.Helper()
+	for _, rt := range h.Routes() {
+		if rt.Method == method && rt.Pattern == pattern {
+			return rt.Handler
+		}
+	}
+	t.Fatalf("route %s %s not found", method, pattern)
+	return nil
+}
+
+func withBody(uid uuid.UUID, body any) *http.Request {
+	var buf bytes.Buffer
+	_ = json.NewEncoder(&buf).Encode(body)
+	r := httptest.NewRequest(http.MethodPost, "/", &buf)
+	return r.WithContext(reqctx.WithUser(r.Context(), reqctx.User{ID: uid}))
+}
+
+func TestReadEndpointsReturn200(t *testing.T) {
+	h := NewHandler(fakeService{profile: &Profile{}})
+	for _, pattern := range []string{"/me", "/professions", "/subjects"} {
+		t.Run("GET "+pattern, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			route(t, h, http.MethodGet, pattern)(rec, reqWithUser(uuid.New()))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestPatchMeReturns200(t *testing.T) {
+	h := NewHandler(fakeService{profile: &Profile{}})
+	rec := httptest.NewRecorder()
+	route(t, h, http.MethodPatch, "/me")(rec, withBody(uuid.New(), UpdateProfileRequest{AcademicLevel: ptr("primaria")}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateProfessionReturns201(t *testing.T) {
+	h := NewHandler(fakeService{profile: &Profile{}})
+	rec := httptest.NewRecorder()
+	route(t, h, http.MethodPost, "/professions")(rec, withBody(uuid.New(), CreateProfessionRequest{Name: "Ingeniería"}))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (%s)", rec.Code, rec.Body.String())
+	}
 }
 
 func TestGetMeOK(t *testing.T) {

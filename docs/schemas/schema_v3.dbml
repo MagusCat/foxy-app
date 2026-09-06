@@ -1,0 +1,373 @@
+// Foxy — schema v3. dbdiagram.io: New diagram -> Import -> DBML
+// 22 tables. `usage` is a view over messages + materials + attachments, not a table.
+
+Enum system_role { user admin auditor }
+Enum user_kind { student teacher professional }
+Enum member_role { owner member }
+Enum message_role { user assistant system }
+Enum processing_status { pending ready failed }
+
+// ══════════════════════════ Catalog ══════════════════════════
+
+Table professions {
+  id   smallint    [pk, increment]
+  slug varchar(50) [not null, unique, note: 'Stable machine key; name is the display label and may change']
+  name varchar(80) [not null]
+}
+
+Table subjects {
+  id         smallint    [pk, increment]
+  slug       varchar(50) [not null, unique, note: 'The client hashes this for the accent color, not the name']
+  name       varchar(80) [not null]
+  created_by uuid        [ref: > profiles.id, note: 'NULL = global catalog; set = private to that user']
+  created_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    `norm(name)` [unique, name: 'uq_subjects_global']
+    (created_by, `norm(name)`) [unique, name: 'uq_subjects_user']
+  }
+}
+
+Table achievements {
+  id          smallint     [pk, increment]
+  slug        varchar(50)  [not null, unique]
+  title       varchar(80)  [not null]
+  description varchar(200) [not null]
+  icon        varchar(40)  [not null]
+  color       varchar(9)   [not null]
+  position    integer      [not null, default: 0]
+}
+
+// ══════════════════════════ Identity ══════════════════════════
+
+Table profiles {
+  id                  uuid         [pk, note: 'Same UUID as auth.users.id; deleting the auth user cascades everywhere']
+  display_name        varchar(80)
+  avatar_url          varchar(500)
+  system_role         system_role  [not null, default: 'user', note: 'Platform permissions only. Independent from user_kind and member_role']
+  user_kind           user_kind    [not null, default: 'student']
+  profession_id       smallint     [ref: > professions.id]
+  academic_level      varchar(20)  [note: 'primaria | secundaria | preparatoria | tecnico | universidad | posgrado | curso | autodidacta']
+  main_goal           varchar(500)
+  custom_instructions text         [note: 'Appended to the AI system prompt']
+  current_streak      integer      [not null, default: 0, note: 'Cache; rebuildable from study_sessions']
+  longest_streak      integer      [not null, default: 0]
+  last_active_date    date
+  streak_freezes      smallint     [not null, default: 1]
+  streak_frozen_days  "date[]"     [not null, default: `'{}'`, note: 'Days saved by a freeze. State, not derived from the log']
+  preferences         jsonb        [not null, default: `'{}'`, note: 'Learning and notification settings. Read whole, never filtered']
+  created_at          timestamptz  [not null, default: `now()`]
+
+  Note: 'One row per auth.users, created by the on_auth_user_created trigger.'
+}
+
+Table user_subjects {
+  user_id    uuid     [not null, ref: > profiles.id]
+  subject_id smallint [not null, ref: > subjects.id]
+
+  Indexes {
+    (user_id, subject_id) [pk]
+  }
+}
+
+Table user_achievements {
+  user_id        uuid        [not null, ref: > profiles.id]
+  achievement_id smallint    [not null, ref: > achievements.id]
+  unlocked_at    timestamptz [not null, default: `now()`]
+  seen_at        timestamptz [note: 'NULL = the user still has to be notified once']
+
+  Indexes {
+    (user_id, achievement_id) [pk]
+    (user_id) [name: 'idx_user_achievements_new']
+  }
+
+  Note: 'Unlocks only: the row exists = unlocked.'
+}
+
+// ══════════════════════════ Notebooks ══════════════════════════
+
+Table notebooks {
+  id               uuid         [pk, default: `gen_random_uuid()`]
+  name             varchar(120) [not null]
+  subject_id       smallint     [ref: > subjects.id]
+  is_collaborative boolean      [not null, default: false]
+  join_code        varchar(6)   [unique, note: 'Server-generated. NULL means not joinable']
+  created_at       timestamptz  [not null, default: `now()`]
+
+  Note: 'Personal notebook, or a shared class notebook. Access comes only from notebook_members.'
+}
+
+Table notebook_members {
+  notebook_id   uuid        [not null, ref: > notebooks.id]
+  user_id   uuid        [not null, ref: > profiles.id]
+  role      member_role [not null, default: 'member', note: 'owner is the creator and the only one who may edit the notebook']
+  joined_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (notebook_id, user_id) [pk]
+    (user_id) [name: 'idx_members_user']
+  }
+
+  Note: 'The single source of truth for notebook access.'
+}
+
+Table notebook_topics {
+  id         uuid         [pk, default: `gen_random_uuid()`]
+  notebook_id    uuid         [not null, ref: > notebooks.id]
+  name       varchar(120) [not null]
+  position   integer      [not null, default: 0]
+  created_at timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (notebook_id, name) [unique]
+  }
+
+  Note: 'Syllabus of a notebook. Content, not goals: use objectives for per-user progress.'
+}
+
+Table notebook_objectives {
+  id          uuid         [pk, default: `gen_random_uuid()`]
+  notebook_id     uuid         [not null, ref: > notebooks.id]
+  title       varchar(200) [not null]
+  description text
+  position    integer      [not null, default: 0]
+  created_at  timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (notebook_id) [name: 'idx_objectives_notebook']
+  }
+}
+
+Table objective_progress {
+  objective_id uuid        [not null, ref: > notebook_objectives.id]
+  user_id      uuid        [not null, ref: > profiles.id]
+  progress_pct smallint    [not null, default: 0, note: '0..100']
+  updated_at   timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (objective_id, user_id) [pk]
+  }
+
+  Note: 'Membership is not enforced here; the backend must check it.'
+}
+
+Table notebook_posts {
+  id         uuid        [pk, default: `gen_random_uuid()`]
+  notebook_id    uuid        [not null, ref: > notebooks.id]
+  author_id  uuid        [not null, ref: > profiles.id, note: 'An id, not the name: renaming must not rewrite old posts']
+  parent_id  uuid        [ref: > notebook_posts.id, note: 'Set = it is a comment on that post']
+  kind       varchar(20) [not null, note: 'anuncio | tarea | material']
+  body       text        [not null]
+  due_at     timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  Indexes {
+    (notebook_id, created_at) [name: 'idx_posts_notebook']
+    (parent_id, created_at) [name: 'idx_posts_replies']
+  }
+
+  Note: 'Notebook wall: announcements, assignments and material.'
+}
+
+// ══════════════════════════ AI ══════════════════════════
+
+Table conversations {
+  id         uuid         [pk, default: `gen_random_uuid()`]
+  user_id    uuid         [not null, ref: > profiles.id]
+  notebook_id    uuid         [ref: > notebooks.id, note: 'NULL = personal chat. Set = access comes from membership, not user_id']
+  subject_id smallint     [ref: > subjects.id]
+  kind       varchar(10)  [not null, default: 'ai', note: 'ai = thread with the model. group = between notebook members; the AI does not reply']
+  title      varchar(200)
+  created_at timestamptz  [not null, default: `now()`]
+  updated_at timestamptz  [not null, default: `now()`, note: 'Sort key of the chat list; the backend must touch it on every message']
+
+  Indexes {
+    (user_id, updated_at, id) [name: 'idx_conversations_user_page']
+    (notebook_id, id) [name: 'idx_conversations_notebook']
+  }
+}
+
+Table messages {
+  id              uuid         [pk, default: `gen_random_uuid()`]
+  conversation_id uuid         [not null, ref: > conversations.id]
+  sender_id       uuid         [ref: > profiles.id, note: 'Who wrote it. NULL = generated by the AI']
+  role            message_role [not null]
+  content         text         [not null]
+  saved           boolean      [not null, default: false, note: 'Bookmarked by the user; backs the history screen']
+  mode            varchar(10)  [note: 'respuesta | pasos | quiz. Must reach the prompt']
+  created_at      timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (conversation_id, created_at, id) [name: 'idx_messages_conv_page']
+    (sender_id, created_at) [name: 'idx_messages_saved']
+  }
+}
+
+Table materials {
+  id              uuid         [pk, default: `gen_random_uuid()`]
+  user_id         uuid         [not null, ref: > profiles.id]
+  notebook_id         uuid         [ref: > notebooks.id, note: 'Set = shared with the notebook; NULL = private to the author']
+  conversation_id uuid         [ref: > conversations.id]
+  post_id         uuid         [ref: > notebook_posts.id, note: 'AI material attached to a wall post']
+  type            varchar(20)  [not null, note: 'summary | flashcards | exam | assignment | notes | lesson_text | true_false | exercise | weak_areas']
+  title           varchar(200) [not null]
+  content         jsonb        [not null, default: `'{}'`, note: 'Whole payload, always read and written as one blob']
+  created_at      timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (user_id, created_at, id) [name: 'idx_materials_user_page']
+    (notebook_id, created_at) [name: 'idx_materials_notebook']
+    (post_id) [name: 'idx_materials_post']
+    (conversation_id) [name: 'idx_materials_conv']
+  }
+}
+
+Table exam_attempts {
+  id           uuid           [pk, default: `gen_random_uuid()`]
+  material_id  uuid           [not null, ref: > materials.id]
+  user_id      uuid           [not null, ref: > profiles.id]
+  started_at   timestamptz    [not null, default: `now()`]
+  submitted_at timestamptz    [note: 'NULL = in progress; only one such row per exam and user']
+  score        "numeric(5,2)" [note: '0..100, NULL until graded']
+  answers      jsonb          [not null, default: `'{}'`]
+
+  Indexes {
+    (material_id, user_id, started_at) [name: 'idx_attempts_material_user']
+    (material_id, user_id) [unique, name: 'uq_attempt_open']
+  }
+
+  Note: 'One exam run, and also one assignment submission.'
+}
+
+Table attachments {
+  id                uuid              [pk, default: `gen_random_uuid()`]
+  user_id           uuid              [not null, ref: > profiles.id]
+  conversation_id   uuid              [ref: > conversations.id]
+  message_id        uuid              [ref: > messages.id, note: 'NULL = uploaded but not sent yet']
+  post_id           uuid              [ref: > notebook_posts.id]
+  plan_id           uuid              [ref: > study_plans.id]
+  storage_path      varchar(500)      [not null, note: 'Object key in the bucket. Deleting this row does not delete the object']
+  file_name         varchar(255)      [not null]
+  mime_type         varchar(100)
+  size_bytes        bigint
+  processing_status processing_status [not null, default: 'pending']
+  extracted_text    text              [note: 'Text pulled by the ai-service, fed to the model as context']
+  created_at        timestamptz       [not null, default: `now()`]
+
+  Indexes {
+    (user_id, created_at) [name: 'idx_attachments_user_ready']
+    (conversation_id) [name: 'idx_attachments_conv']
+    (message_id) [name: 'idx_attachments_message']
+    (post_id) [name: 'idx_attachments_post']
+    (plan_id) [name: 'idx_attachments_plan']
+  }
+}
+
+Table document_chunks {
+  id            uuid           [pk, default: `gen_random_uuid()`]
+  attachment_id uuid           [not null, ref: > attachments.id]
+  notebook_id       uuid           [ref: > notebooks.id, note: 'Denormalized. The ai-service must write it or search cannot be scoped by notebook']
+  content       text           [not null]
+  embedding     "vector(1536)" [note: 'Changing the embedding model means rebuilding this column and its index']
+  chunk_index   smallint       [not null]
+  metadata      jsonb          [not null, default: `'{}'`]
+
+  Indexes {
+    (attachment_id, chunk_index) [unique]
+    (embedding) [name: 'hnsw vector_cosine_ops']
+  }
+
+  Note: 'Chunks of an attachment with their embedding, for semantic search.'
+}
+
+// ══════════════════════════ Progress ══════════════════════════
+
+Table study_plans {
+  id           uuid         [pk, default: `gen_random_uuid()`]
+  user_id      uuid         [not null, ref: > profiles.id]
+  notebook_id      uuid         [ref: > notebooks.id]
+  subject_id   smallint     [ref: > subjects.id]
+  title        varchar(200) [not null]
+  exam_date    date         [not null]
+  target_grade smallint     [note: '0..100']
+  language     "char(2)"    [not null, default: 'es', note: 'es | en | pt | fr | de | it']
+  survey       jsonb        [not null, default: `'[]'`]
+  hidden       boolean      [not null, default: false]
+  created_at   timestamptz  [not null, default: `now()`]
+  updated_at   timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (user_id, exam_date) [name: 'idx_plans_user']
+  }
+
+  Note: 'Exam study plan. The AI builds the outline from the uploaded material.'
+}
+
+Table plan_lessons {
+  id          uuid         [pk, default: `gen_random_uuid()`]
+  plan_id     uuid         [not null, ref: > study_plans.id]
+  topic_index smallint     [not null]
+  topic_title varchar(200) [not null]
+  position    smallint     [not null]
+  title       varchar(200) [not null]
+  kind        varchar(10)  [not null, note: 'intro | practica | quiz | reto']
+  level       smallint     [not null, default: 1]
+  done_at     timestamptz  [note: 'NULL = pending. One column instead of done + doneAt']
+  material_id uuid         [ref: > materials.id, note: 'Content generated on demand the first time the lesson is opened']
+
+  Indexes {
+    (plan_id, topic_index, position) [unique]
+    (plan_id, done_at) [name: 'idx_lessons_plan_done']
+    (material_id) [name: 'idx_lessons_material']
+  }
+
+  Note: 'Ordered lessons. The topic is flattened here: it has no identity of its own.'
+}
+
+Table study_sessions {
+  id          uuid         [pk, default: `gen_random_uuid()`]
+  user_id     uuid         [not null, ref: > profiles.id]
+  kind        varchar(10)  [not null, note: 'chat | scan | exam | lesson | class | focus']
+  subject_id  smallint     [ref: > subjects.id]
+  title       varchar(200) [not null]
+  minutes     smallint     [not null, default: 0]
+  occurred_at timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (user_id, occurred_at) [name: 'idx_sessions_user_time']
+  }
+
+  Note: 'Activity log. Backs the Activity screen, the streak, focus mode and achievements.'
+}
+
+Table events {
+  id          uuid         [pk, default: `gen_random_uuid()`]
+  user_id     uuid         [not null, ref: > profiles.id]
+  notebook_id     uuid         [ref: > notebooks.id, note: 'NULL = private, set = the whole notebook sees it']
+  material_id uuid         [ref: > materials.id]
+  post_id     uuid         [ref: > notebook_posts.id, note: 'Assignment this deadline comes from; fills the notebook calendar automatically']
+  subject_id  smallint     [ref: > subjects.id]
+  title       varchar(200) [not null]
+  description text
+  kind        varchar(10)  [not null, note: 'class | exam | due | session | reminder']
+  starts_at   timestamptz  [not null]
+  ends_at     timestamptz
+  created_at  timestamptz  [not null, default: `now()`]
+
+  Note: 'User calendar. No recurrence: a weekly class is one row per week.'
+
+  Indexes {
+    (user_id, starts_at) [name: 'idx_events_user_time']
+    (notebook_id, starts_at) [name: 'idx_events_notebook_time']
+    (material_id) [name: 'idx_events_material']
+    (post_id) [name: 'idx_events_post']
+  }
+}
+
+TableGroup catalog  { professions subjects achievements }
+TableGroup identity { profiles user_subjects user_achievements }
+TableGroup notebooks { notebooks notebook_members notebook_topics notebook_objectives objective_progress notebook_posts }
+TableGroup ai       { conversations messages materials exam_attempts attachments document_chunks }
+TableGroup progress { study_plans plan_lessons study_sessions events }

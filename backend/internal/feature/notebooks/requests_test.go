@@ -1,4 +1,4 @@
-package zones
+package notebooks
 
 import (
 	"strings"
@@ -7,20 +7,20 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
-func TestZoneRequestsValidate(t *testing.T) {
+func TestNotebookRequestsValidate(t *testing.T) {
 	long := strings.Repeat("x", 101)
 	cases := []struct {
 		name    string
 		req     interface{ Validate() error }
 		wantErr bool
 	}{
-		{"create ok", CreateZoneRequest{Name: "Cálculo"}, false},
-		{"create empty name", CreateZoneRequest{Name: "  "}, true},
-		{"create name too long", CreateZoneRequest{Name: long}, true},
-		{"update empty is ok", UpdateZoneRequest{}, false},
-		{"update blank name", UpdateZoneRequest{Name: ptr("  ")}, true},
-		{"join ok", JoinZoneRequest{Code: "AB12CD"}, false},
-		{"join empty", JoinZoneRequest{Code: ""}, true},
+		{"create ok", CreateNotebookRequest{Name: "Cálculo"}, false},
+		{"create empty name", CreateNotebookRequest{Name: "  "}, true},
+		{"create name too long", CreateNotebookRequest{Name: long}, true},
+		{"update empty is ok", UpdateNotebookRequest{}, false},
+		{"update blank name", UpdateNotebookRequest{Name: ptr("  ")}, true},
+		{"join ok", JoinNotebookRequest{Code: "AB12CD"}, false},
+		{"join empty", JoinNotebookRequest{Code: ""}, true},
 		{"objective ok", CreateObjectiveRequest{Title: "Derivadas"}, false},
 		{"objective empty title", CreateObjectiveRequest{Title: ""}, true},
 		{"progress ok", SetProgressRequest{ProgressPct: 60}, false},

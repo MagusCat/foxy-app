@@ -31,7 +31,10 @@ func TestGenerateRequestValidate(t *testing.T) {
 
 func TestValidTypesAreAllProductTypes(t *testing.T) {
 	// Guards against silently accepting a type the DB CHECK would reject.
-	want := map[string]bool{TypeSummary: true, TypeFlashcards: true, TypeExam: true, TypeAssignment: true, TypeNotes: true}
+	want := map[string]bool{
+		TypeSummary: true, TypeFlashcards: true, TypeExam: true, TypeAssignment: true, TypeNotes: true,
+		TypeLessonText: true, TypeTrueFalse: true, TypeExercise: true, TypeWeakAreas: true,
+	}
 	if len(validTypes) != len(want) {
 		t.Fatalf("validTypes drifted: %v", validTypes)
 	}

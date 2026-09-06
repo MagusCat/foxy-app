@@ -64,6 +64,26 @@ func (rl *RateLimiter) janitor() {
 	}
 }
 
+// MaxConcurrent caps how many requests can be inside the handler at once. The
+// per-user rate limiter does not bound this: an SSE stream lives for as long as
+// the model takes to answer, and those routes carry no WriteTimeout, so a client
+// that opens connections and never reads would otherwise pin goroutines and
+// buffers indefinitely. Over the limit it is a clean 429, not a slow death.
+func MaxConcurrent(n int) func(http.Handler) http.Handler {
+	slots := make(chan struct{}, n)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case slots <- struct{}{}:
+				defer func() { <-slots }()
+				next.ServeHTTP(w, r)
+			default:
+				httpx.WriteError(w, r, apperr.ErrRateLimited)
+			}
+		})
+	}
+}
+
 // Middleware goes AFTER auth: it needs the user from the context.
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

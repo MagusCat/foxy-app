@@ -11,7 +11,7 @@ import (
 
 const pgUniqueViolation = "23505" // Postgres unique_violation SQLSTATE
 
-// errDupName maps the UNIQUE (zone_id, name) violation to a 409 instead of a 500.
+// errDupName maps the UNIQUE (notebook_id, name) violation to a 409 instead of a 500.
 var errDupName = apperr.Conflict("ya existe un tema con ese nombre en la zona")
 
 type Service struct {
@@ -20,12 +20,12 @@ type Service struct {
 
 func NewService(repo *Repository) *Service { return &Service{repo: repo} }
 
-func (s *Service) List(ctx context.Context, userID, zoneID uuid.UUID) ([]Topic, error) {
-	return s.repo.List(ctx, userID, zoneID)
+func (s *Service) List(ctx context.Context, userID, notebookID uuid.UUID) ([]Topic, error) {
+	return s.repo.List(ctx, userID, notebookID)
 }
 
-func (s *Service) Create(ctx context.Context, userID, zoneID uuid.UUID, req CreateTopicRequest) (*Topic, error) {
-	t, err := s.repo.Create(ctx, userID, zoneID, req)
+func (s *Service) Create(ctx context.Context, userID, notebookID uuid.UUID, req CreateTopicRequest) (*Topic, error) {
+	t, err := s.repo.Create(ctx, userID, notebookID, req)
 	return t, mapDupName(err)
 }
 

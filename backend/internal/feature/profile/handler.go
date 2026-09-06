@@ -15,6 +15,7 @@ type service interface {
 	Update(ctx context.Context, id uuid.UUID, req UpdateProfileRequest) (*Profile, error)
 	ListProfessions(ctx context.Context) ([]Profession, error)
 	CreateProfession(ctx context.Context, name string) (*Profession, error)
+	ListSubjects(ctx context.Context, userID uuid.UUID) ([]Subject, error)
 }
 
 type Handler struct {
@@ -36,5 +37,6 @@ func (h *Handler) Routes() []httpx.Route {
 			func(ctx context.Context, _ uuid.UUID, req CreateProfessionRequest) (*Profession, error) {
 				return s.CreateProfession(ctx, req.Name)
 			})},
+		{Method: http.MethodGet, Pattern: "/subjects", Handler: httpx.Handle(http.StatusOK, s.ListSubjects)},
 	}
 }

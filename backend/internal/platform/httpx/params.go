@@ -34,6 +34,21 @@ func QueryUUID(r *http.Request, name string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
+// QueryInt16 reads an optional smallint query parameter. It returns nil when
+// absent (a valid "no filter") and a 400 when present but malformed or out of range.
+func QueryInt16(r *http.Request, name string) (*int16, error) {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return nil, nil
+	}
+	n, err := strconv.ParseInt(raw, 10, 16)
+	if err != nil {
+		return nil, apperr.NewValidation().Add(name, invalidID).Err()
+	}
+	v := int16(n)
+	return &v, nil
+}
+
 // QueryInt reads a numeric query parameter with a default and a cap.
 func QueryInt(r *http.Request, name string, def, maxN int) int {
 	raw := r.URL.Query().Get(name)
