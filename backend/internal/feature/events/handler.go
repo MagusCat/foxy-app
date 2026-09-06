@@ -1,18 +1,28 @@
 package events
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/foxy-app/backend/internal/platform/apperr"
 	"github.com/foxy-app/backend/internal/platform/httpx"
+	"github.com/google/uuid"
 )
 
-type Handler struct {
-	svc *Service
+type service interface {
+	List(ctx context.Context, userID uuid.UUID, from, to *time.Time, notebookID *uuid.UUID) ([]Event, error)
+	Create(ctx context.Context, userID uuid.UUID, req CreateEventRequest) (*Event, error)
+	Get(ctx context.Context, userID, id uuid.UUID) (*Event, error)
+	Update(ctx context.Context, userID, id uuid.UUID, req UpdateEventRequest) (*Event, error)
+	Delete(ctx context.Context, userID, id uuid.UUID) error
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+type Handler struct {
+	svc service
+}
+
+func NewHandler(svc service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Routes() []httpx.Route {
 	s := h.svc
@@ -25,7 +35,7 @@ func (h *Handler) Routes() []httpx.Route {
 	}
 }
 
-// list is custom (not httpx.Handle) because it reads the ?from=&to=&zone_id=
+// list is custom (not httpx.Handle) because it reads the ?from=&to=&notebook_id=
 // calendar-range filters from the query string.
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	uid, err := httpx.RequireUser(r)
@@ -33,7 +43,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	zoneID, err := httpx.QueryUUID(r, "zone_id")
+	notebookID, err := httpx.QueryUUID(r, "notebook_id")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -48,7 +58,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	list, err := h.svc.List(r.Context(), uid, from, to, zoneID)
+	list, err := h.svc.List(r.Context(), uid, from, to, notebookID)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return

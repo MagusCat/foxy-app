@@ -9,12 +9,14 @@ import (
 )
 
 type CreateEventRequest struct {
-	ZoneID     *uuid.UUID `json:"zone_id"`     // nil = private event
-	MaterialID *uuid.UUID `json:"material_id"` // nil = not tied to a material
-	Title      string     `json:"title"`
-	Kind       string     `json:"kind"`
-	StartsAt   time.Time  `json:"starts_at"`
-	EndsAt     *time.Time `json:"ends_at"`
+	NotebookID  *uuid.UUID `json:"notebook_id"` // nil = private event
+	MaterialID  *uuid.UUID `json:"material_id"` // nil = not tied to a material
+	SubjectID   *int16     `json:"subject_id"`
+	Title       string     `json:"title"`
+	Description *string    `json:"description"`
+	Kind        string     `json:"kind"`
+	StartsAt    time.Time  `json:"starts_at"`
+	EndsAt      *time.Time `json:"ends_at"`
 }
 
 func (r CreateEventRequest) Validate() error {
@@ -34,14 +36,16 @@ func (r CreateEventRequest) Validate() error {
 	return v.Err()
 }
 
-// UpdateEventRequest patches only the time/label fields. zone_id and material_id
-// aren't editable: moving an event between zones is a delete + create, which keeps
+// UpdateEventRequest patches only the time/label fields. notebook_id and material_id
+// aren't editable: moving an event between notebooks is a delete + create, which keeps
 // the visibility change explicit. Pointers distinguish "absent" from "empty".
 type UpdateEventRequest struct {
-	Title    *string    `json:"title"`
-	Kind     *string    `json:"kind"`
-	StartsAt *time.Time `json:"starts_at"`
-	EndsAt   *time.Time `json:"ends_at"`
+	Title       *string    `json:"title"`
+	Description *string    `json:"description"`
+	SubjectID   *int16     `json:"subject_id"`
+	Kind        *string    `json:"kind"`
+	StartsAt    *time.Time `json:"starts_at"`
+	EndsAt      *time.Time `json:"ends_at"`
 }
 
 func (r UpdateEventRequest) Validate() error {

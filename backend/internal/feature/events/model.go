@@ -1,6 +1,6 @@
 // Package events handles the user's calendar: classes, exams, deadlines, study
-// sessions and reminders. An event with a zone_id is visible to the whole zone;
-// without one it is private to its owner.
+// sessions and reminders. An event with a notebook_id is visible to the whole
+// notebook; without one it is private to its owner.
 package events
 
 import (
@@ -15,13 +15,15 @@ var eventKinds = map[string]bool{
 }
 
 type Event struct {
-	ID         uuid.UUID  `db:"id" json:"id"`
-	UserID     uuid.UUID  `db:"user_id" json:"user_id"`
-	ZoneID     *uuid.UUID `db:"zone_id" json:"zone_id"`
-	MaterialID *uuid.UUID `db:"material_id" json:"material_id"`
-	Title      string     `db:"title" json:"title"`
-	Kind       string     `db:"kind" json:"kind"`
-	StartsAt   time.Time  `db:"starts_at" json:"starts_at"`
-	EndsAt     *time.Time `db:"ends_at" json:"ends_at"`
-	CreatedAt  time.Time  `db:"created_at" json:"created_at"`
+	ID          uuid.UUID  `db:"id" json:"id"`
+	UserID      uuid.UUID  `db:"user_id" json:"user_id"`
+	NotebookID  *uuid.UUID `db:"notebook_id" json:"notebook_id"`
+	MaterialID  *uuid.UUID `db:"material_id" json:"material_id"`
+	SubjectID   *int16     `db:"subject_id" json:"subject_id"`
+	Title       string     `db:"title" json:"title"`
+	Description *string    `db:"description" json:"description"`
+	Kind        string     `db:"kind" json:"kind"`
+	StartsAt    time.Time  `db:"starts_at" json:"starts_at"`
+	EndsAt      *time.Time `db:"ends_at" json:"ends_at"`
+	CreatedAt   time.Time  `db:"created_at" json:"created_at"`
 }
