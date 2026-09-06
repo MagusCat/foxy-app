@@ -15,7 +15,7 @@ func TestForeignUserGets404(t *testing.T) {
 	ctx := context.Background()
 	repo := NewRepository(pool)
 
-	conv, err := repo.CreateConversation(ctx, alice, nil, nil)
+	conv, err := repo.CreateConversation(ctx, alice, CreateConversationRequest{Kind: kindAI})
 	if err != nil {
 		t.Fatalf("Alice could not create her conversation: %v", err)
 	}

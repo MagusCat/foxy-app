@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/foxy-app/backend/internal/platform/apperr"
 	"github.com/foxy-app/backend/internal/platform/httpx"
+	"github.com/google/uuid"
 )
 
 // Pagination defaults and caps for the listing endpoints.
@@ -23,11 +25,22 @@ const (
 // AI is producing the first token.
 const heartbeatInterval = 15 * time.Second
 
-type Handler struct {
-	svc *Service
+type service interface {
+	ListConversations(ctx context.Context, userID uuid.UUID, notebookID *uuid.UUID, subjectID *int16, rawCursor string, limit int) ([]Conversation, string, error)
+	CreateConversation(ctx context.Context, userID uuid.UUID, req CreateConversationRequest) (*Conversation, error)
+	Conversation(ctx context.Context, userID, id uuid.UUID) (*Conversation, error)
+	DeleteConversation(ctx context.Context, userID, id uuid.UUID) error
+	ListMessages(ctx context.Context, userID, convID uuid.UUID, rawCursor string, limit int) ([]Message, string, error)
+	ListSaved(ctx context.Context, userID uuid.UUID, rawCursor string, limit int) ([]Message, string, error)
+	SetSaved(ctx context.Context, userID, msgID uuid.UUID, saved bool) (*Message, error)
+	StreamReply(ctx context.Context, userID uuid.UUID, conv *Conversation, req SendMessageRequest, onToken func(string)) (*Message, error)
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+type Handler struct {
+	svc service
+}
+
+func NewHandler(svc service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Routes() []httpx.Route {
 	return []httpx.Route{
@@ -38,6 +51,11 @@ func (h *Handler) Routes() []httpx.Route {
 		// The only endpoint that responds over SSE and costs money (Paid -> rate-limit;
 		// Stream -> no global timeout, which would kill the streaming).
 		{Method: http.MethodPost, Pattern: "/conversations/{id}/messages", Handler: h.sendMessage, Paid: true, Stream: true},
+		{Method: http.MethodGet, Pattern: "/messages", Handler: h.listSaved},
+		{Method: http.MethodPut, Pattern: "/messages/{id}/saved", Handler: httpx.HandleBodyID(http.StatusOK,
+			func(ctx context.Context, uid, msgID uuid.UUID, req SetSavedRequest) (*Message, error) {
+				return h.svc.SetSaved(ctx, uid, msgID, req.Saved)
+			})},
 	}
 }
 
@@ -47,13 +65,33 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	zoneID, err := httpx.QueryUUID(r, "zone_id")
+	notebookID, err := httpx.QueryUUID(r, "notebook_id")
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	subjectID, err := httpx.QueryInt16(r, "subject_id")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
 	limit := httpx.QueryInt(r, "limit", defaultConvLimit, maxConvLimit)
-	list, next, err := h.svc.ListConversations(r.Context(), uid, zoneID, r.URL.Query().Get("cursor"), limit)
+	list, next, err := h.svc.ListConversations(r.Context(), uid, notebookID, subjectID, r.URL.Query().Get("cursor"), limit)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WritePage(w, r, list, next)
+}
+
+func (h *Handler) listSaved(w http.ResponseWriter, r *http.Request) {
+	uid, err := httpx.RequireUser(r)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	limit := httpx.QueryInt(r, "limit", defaultMsgLimit, maxMsgLimit)
+	list, next, err := h.svc.ListSaved(r.Context(), uid, r.URL.Query().Get("cursor"), limit)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -127,7 +165,7 @@ func (h *Handler) sendMessage(w http.ResponseWriter, r *http.Request) {
 	onToken := func(tok string) {
 		sw.event("token", map[string]string{"content": tok})
 	}
-	assistant, err := h.svc.StreamReply(r.Context(), uid, conv, req.Content, onToken)
+	assistant, err := h.svc.StreamReply(r.Context(), uid, conv, req, onToken)
 	close(stop) // stop the heartbeat before the final event
 
 	if err != nil {
