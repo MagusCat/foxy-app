@@ -28,8 +28,18 @@ func New(supabaseURL, serviceKey, bucket string) *Client {
 		baseURL:    strings.TrimRight(supabaseURL, "/") + "/storage/v1",
 		serviceKey: serviceKey,
 		bucket:     bucket,
-		http:       &http.Client{Timeout: 15 * time.Second},
+		http:       &http.Client{Timeout: 15 * time.Second, Transport: newTransport()},
 	}
+}
+
+// newTransport: the default Transport keeps 2 idle connections per host, which
+// turns every concurrent upload-url request into a fresh TLS handshake.
+func newTransport() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.MaxIdleConns = 100
+	t.MaxIdleConnsPerHost = 50
+	t.IdleConnTimeout = 90 * time.Second
+	return t
 }
 
 // NewPath builds a unique, ordered path: userID/uuid/file. The uuid avoids
