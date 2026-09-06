@@ -43,13 +43,18 @@ func Run() error {
 		return err
 	}
 
+	handler, cleanup := newRouter(cfg, pool, authr)
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           newRouter(cfg, pool, authr),
+		Addr:              cfg.Host + ":" + cfg.Port,
+		Handler:           handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		// No WriteTimeout: it would break the SSE streaming of long responses.
 	}
-	return serve(ctx, srv, cfg.ShutdownTimeout)
+	err = serve(ctx, srv, cfg.ShutdownTimeout)
+	// After Shutdown: no handler can still be enqueueing work, so this only waits
+	// for what is already running instead of racing it.
+	cleanup()
+	return err
 }
 
 func serve(ctx context.Context, srv *http.Server, shutdownTimeout time.Duration) error {
