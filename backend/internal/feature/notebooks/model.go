@@ -1,6 +1,6 @@
-// Package zones handles study zones (a personal subject or a collaborative
-// classroom), their members, objectives, and each user's progress.
-package zones
+// Package notebooks handles study notebooks (a personal notebook or a
+// collaborative classroom), their members, objectives, and each user's progress.
+package notebooks
 
 import (
 	"time"
@@ -8,17 +8,17 @@ import (
 	"github.com/google/uuid"
 )
 
-// Zone member roles (member_role enum in the DB). Ownership lives in
-// study_zone_members.role, not in a column on study_zones.
+// Notebook member roles (member_role enum in the DB). Ownership lives in
+// notebook_members.role, not in a column on notebooks.
 const (
 	roleOwner  = "owner"
 	roleMember = "member"
 )
 
-type Zone struct {
+type Notebook struct {
 	ID              uuid.UUID `db:"id" json:"id"`
 	Name            string    `db:"name" json:"name"`
-	Subject         *string   `db:"subject" json:"subject"`
+	SubjectID       *int16    `db:"subject_id" json:"subject_id"`
 	IsCollaborative bool      `db:"is_collaborative" json:"is_collaborative"`
 	JoinCode        *string   `db:"join_code" json:"join_code"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
@@ -34,7 +34,7 @@ type Member struct {
 // Objective includes progress_pct: the progress of the requesting user (0 if not started).
 type Objective struct {
 	ID          uuid.UUID `db:"id" json:"id"`
-	ZoneID      uuid.UUID `db:"zone_id" json:"zone_id"`
+	NotebookID  uuid.UUID `db:"notebook_id" json:"notebook_id"`
 	Title       string    `db:"title" json:"title"`
 	Description *string   `db:"description" json:"description"`
 	Position    int       `db:"position" json:"position"`
