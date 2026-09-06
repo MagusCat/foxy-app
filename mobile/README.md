@@ -1,28 +1,26 @@
 # Módulo Mobile
 
-Este directorio alberga la aplicación móvil multiplataforma desarrollada en React Native para Foxy.
+Cliente móvil multiplataforma de Foxy, en React Native (Expo). **Aún no
+implementado**: este directorio es el marcador del módulo.
 
----
+Consume la API del backend Go (`/api/v1`); nunca llama al ai-service directo.
+El contrato que debe seguir está en
+[../docs/mobile-integration.md](../docs/mobile-integration.md).
 
-## Responsabilidades del Módulo
+## Responsabilidades (previstas)
 
-1. **Interfaz de Usuario (UI/UX)**: Proveer una experiencia intuitiva, fluida y accesible tanto para estudiantes como para docentes.
-2. **Consumo de APIs**: Comunicación con el servidor principal en Go (`backend`) para autenticación, gestión de perfiles y solicitudes de generación de contenido.
-3. **Interacción en Tiempo Real**: Soporte de eventos en tiempo real para la resolución y evaluación instantánea de pruebas y tests.
-4. **Gestión de Archivos**: Captura y carga de documentos (PDFs, imágenes de apuntes, textos) enviados por el usuario para alimentar el motor adaptativo.
+- Interfaz para estudiantes y docentes.
+- Autenticación con Supabase Auth y consumo de la API del backend.
+- Subida de documentos a Supabase Storage mediante URL firmada.
+- Chat por streaming (SSE) y visualización del material generado
+  (flashcards, exámenes, resúmenes).
 
----
+## Puesta en marcha
 
-## Funciones Principales
+```bash
+npm install
+npm start
+```
 
-### Para Estudiantes
-- **Visualizador de Planes de Estudio**: Malla curricular interactiva con seguimiento de avance.
-- **Reproductor de Flashcards**: Sistema interactivo de tarjetas de memorización autodidacta.
-- **Módulo de Evaluación**: Interfaz de cuestionarios y tests con retroalimentación inmediata.
-
-### Para Docentes
-- **Generador Asistido de Contenidos**: Formularios para parametrizar y recibir planes educativos de asignatura.
-- **Explorador de Recursos**: Vista de sugerencias didácticas y material de apoyo.
-
-### Integración de IA
-- **Envío de Contexto**: Interfaz para adjuntar documentos que personalizan la respuesta de la IA.
+Abre Expo: se escanea el QR con Expo Go o se pulsa `a` para un emulador Android.
+`npm run web` levanta la app en el navegador, útil solo para revisar layout.
