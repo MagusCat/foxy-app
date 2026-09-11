@@ -21,6 +21,9 @@
 <p align="center">
   <sub>Hackathon Nicaragua 2026 · categoría Educación</sub>
 </p>
+<p align="center">
+  <sub>Proyecto no clasificado</sub>
+</p>
 
 ---
 
@@ -182,3 +185,4 @@ set -a && . ./.env && set +a && go test ./...
 | El adjunto queda en `failed` | El ai-service no responde, o el bucket no existe. |
 | `401` desde el ai-service | `AI_SERVICE_TOKEN` no coincide entre los dos procesos. |
 | El chat responde siempre lo mismo | Backend en `AI_SERVICE_URL=stub`, o ai-service en `LLM_PROVIDER=fake`. |
+| El proyecto continuara siendo desarrollado | No. |
